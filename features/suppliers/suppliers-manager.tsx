@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import type { Supplier } from "@/types/core";
 
+import { deleteSupplierFromDb, saveSupplierToDb } from "@/services/suppliers.service";
+
 type SupplierForm = Omit<Supplier, "createdAt" | "updatedAt" | "deletedAt">;
 
 export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Supplier[] }) {
@@ -27,7 +29,7 @@ export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Suppl
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [items, query]);
 
-  const saveSupplier = (form: SupplierForm) => {
+  const saveSupplier = async (form: SupplierForm) => {
     const duplicate = items.some((item) => item.id !== editing?.id && item.deletedAt === null && item.name.trim().toLowerCase() === form.name.trim().toLowerCase());
     if (duplicate) {
       setError("Er bestaat al een leverancier met deze naam.");
@@ -42,15 +44,17 @@ export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Suppl
       deletedAt: null
     };
 
-    setItems((current) => editing ? current.map((item) => item.id === editing.id ? next : item) : [next, ...current]);
+    const saved = await saveSupplierToDb(next);
+    setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
     setFormOpen(false);
-    notify({ title: editing ? "Leverancier bijgewerkt" : "Leverancier toegevoegd", description: `${form.name} is opgeslagen.` });
+    notify({ title: editing ? "Leverancier bijgewerkt in Database" : "Leverancier opgeslagen in Database" });
   };
 
-  const removeSupplier = (supplier: Supplier) => {
+  const removeSupplier = async (supplier: Supplier) => {
     if (!window.confirm(`Leverancier "${supplier.name}" verwijderen?`)) return;
+    await deleteSupplierFromDb(supplier.id);
     setItems((current) => current.map((item) => item.id === supplier.id ? { ...item, deletedAt: new Date().toISOString(), isActive: false } : item));
-    notify({ title: "Leverancier verwijderd", description: "Soft delete toegepast." });
+    notify({ title: "Leverancier verwijderd uit Database" });
   };
 
   return (

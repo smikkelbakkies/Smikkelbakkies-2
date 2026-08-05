@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
-import { hasDuplicateIngredientName, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
+import { deleteIngredientFromDb, hasDuplicateIngredientName, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
 import type { Ingredient, IngredientCategory, Supplier, BaseUnit } from "@/types/core";
 
 const baseUnits: BaseUnit[] = ["stuk", "gram", "kg", "ml", "liter", "portie"];
@@ -57,7 +57,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
     }
   };
 
-  const saveIngredient = (form: IngredientForm) => {
+  const saveIngredient = async (form: IngredientForm) => {
     if (hasDuplicateIngredientName(items, form.name, editing?.id)) {
       setError("Er bestaat al een ingrediënt met deze naam.");
       return;
@@ -73,15 +73,17 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       deletedAt: null
     };
 
-    setItems((current) => editing ? current.map((item) => item.id === editing.id ? next : item) : [next, ...current]);
+    const saved = await saveIngredientToDb(next);
+    setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
     setFormOpen(false);
-    notify({ title: editing ? "Ingrediënt bijgewerkt" : "Ingrediënt toegevoegd" });
+    notify({ title: editing ? "Ingrediënt bijgewerkt in Database" : "Ingrediënt opgeslagen in Database" });
   };
 
-  const removeIngredient = (ingredient: Ingredient) => {
+  const removeIngredient = async (ingredient: Ingredient) => {
     if (!window.confirm(`Ingrediënt "${ingredient.name}" verwijderen?`)) return;
+    await deleteIngredientFromDb(ingredient.id);
     setItems((current) => current.map((item) => item.id === ingredient.id ? { ...item, deletedAt: new Date().toISOString(), isActive: false } : item));
-    notify({ title: "Ingrediënt verwijderd" });
+    notify({ title: "Ingrediënt verwijderd uit Database" });
   };
 
   return (

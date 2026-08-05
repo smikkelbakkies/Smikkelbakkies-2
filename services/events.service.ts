@@ -1,5 +1,6 @@
 import type { EventCalculationResult, EventPackageParams, SavedEvent, SavedEventStatus, SupplierOrderGroup, SupplierOrderItem } from "@/types/core";
 import { formatCurrency } from "@/lib/utils";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { listIngredients } from "@/services/ingredients.service";
 import { listProducts } from "@/services/recipes.service";
 import { listSuppliers } from "@/services/suppliers.service";
@@ -220,6 +221,57 @@ export async function generateCustomerQuoteText(
 }
 
 export async function listSavedEvents(): Promise<SavedEvent[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data.map((e) => ({
+        id: e.id,
+        eventName: e.name,
+        eventDate: e.event_date || new Date().toISOString().split("T")[0],
+        clientName: e.location || "Opdrachtgever",
+        clientEmail: "",
+        clientPhone: "",
+        location: e.location || "",
+        status: (e.status as SavedEventStatus) || "concept",
+        params: e.params || {
+          peopleCount: e.people_count || 50,
+          selectedProducts: [],
+          travelHours: Number(e.travel_hours || 0),
+          setupHours: Number(e.setup_hours || 0),
+          serviceHours: Number(e.service_hours || 0),
+          distanceKm: 0,
+          costPerKm: 0.35,
+          fixedCosts: Number(e.fixed_costs || 0),
+          staffCosts: 0,
+          targetEventMargin: Number(e.target_event_margin || 30),
+          partnersCount: 2
+        },
+        calculation: e.calculation || {
+          peopleCount: e.people_count || 50,
+          totalEventHoursElapsed: 5,
+          totalPartnerHoursCombined: 10,
+          totalFoodCost: 200,
+          totalKmCost: 0,
+          totalDirectCosts: 200,
+          advisedPackagePrice: 300,
+          pricePerPerson: 6,
+          totalVofProfit: 100,
+          profitPerPartner: 50,
+          hourlyEarningsPerPartner: 10,
+          isFeasibleForVof: true,
+          feasibilityReason: "Opgehaald uit Supabase"
+        },
+        notes: e.notes || "",
+        createdAt: e.created_at,
+        updatedAt: e.updated_at
+      }));
+    }
+  }
+
   return [...savedEvents].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -251,6 +303,27 @@ export async function saveEvent(data: {
   };
 
   savedEvents.push(newEvent);
+
+  if (isSupabaseConfigured && supabase) {
+    await supabase.from("events").upsert({
+      id: newEvent.id,
+      name: newEvent.eventName,
+      event_date: newEvent.eventDate,
+      location: newEvent.clientName,
+      people_count: newEvent.params.peopleCount,
+      travel_hours: newEvent.params.travelHours,
+      service_hours: newEvent.params.serviceHours,
+      setup_hours: newEvent.params.setupHours,
+      fixed_costs: newEvent.params.fixedCosts,
+      target_event_margin: newEvent.params.targetEventMargin,
+      params: newEvent.params,
+      calculation: newEvent.calculation,
+      status: newEvent.status,
+      created_at: newEvent.createdAt,
+      updated_at: newEvent.updatedAt
+    });
+  }
+
   return newEvent;
 }
 
@@ -263,11 +336,22 @@ export async function updateEventStatus(eventId: string, newStatus: SavedEventSt
       updatedAt: new Date().toISOString()
     };
   }
-  return savedEvents[index];
+
+  if (isSupabaseConfigured && supabase) {
+    await supabase
+      .from("events")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", eventId);
+  }
+
+  return savedEvents[index] || savedEvents[0];
 }
 
 export async function deleteSavedEvent(eventId: string): Promise<void> {
   savedEvents = savedEvents.filter((e) => e.id !== eventId);
+  if (isSupabaseConfigured && supabase) {
+    await supabase.from("events").delete().eq("id", eventId);
+  }
 }
 
 export async function calculateFestivalEvent(params: import("@/types/core").FestivalEventParams): Promise<import("@/types/core").FestivalEventResult> {
