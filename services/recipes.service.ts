@@ -79,7 +79,7 @@ export async function listProducts(): Promise<ProductWithCost[]> {
       .is("deleted_at", null)
       .order("name");
 
-    if (!error && dbProducts && dbProducts.length > 0) {
+    if (!error && dbProducts) {
       rawProducts = dbProducts.map((p) => ({
         id: p.id,
         name: p.name,

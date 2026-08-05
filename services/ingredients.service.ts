@@ -60,7 +60,7 @@ export async function listIngredients(): Promise<Ingredient[]> {
       .is("deleted_at", null)
       .order("name");
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       const parsed: Ingredient[] = data.map((item) => ({
         id: item.id,
         name: item.name,

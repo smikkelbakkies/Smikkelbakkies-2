@@ -246,7 +246,7 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       const parsed: SavedEvent[] = data.map((e) => ({
         id: e.id,
         eventName: e.name,

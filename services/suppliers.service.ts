@@ -31,7 +31,7 @@ export async function listSuppliers(): Promise<Supplier[]> {
       .is("deleted_at", null)
       .order("name");
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       const parsed: Supplier[] = data.map((item) => ({
         id: item.id,
         name: item.name,
