@@ -220,6 +220,25 @@ export async function generateCustomerQuoteText(
   return text;
 }
 
+function getLocalStorageEvents(): SavedEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("smikkel_saved_events");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setLocalStorageEvents(items: SavedEvent[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("smikkel_saved_events", JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export async function listSavedEvents(): Promise<SavedEvent[]> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
@@ -228,7 +247,7 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
       .order("created_at", { ascending: false });
 
     if (!error && data && data.length > 0) {
-      return data.map((e) => ({
+      const parsed: SavedEvent[] = data.map((e) => ({
         id: e.id,
         eventName: e.name,
         eventDate: e.event_date || new Date().toISOString().split("T")[0],
@@ -269,7 +288,15 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
         createdAt: e.created_at,
         updatedAt: e.updated_at
       }));
+
+      setLocalStorageEvents(parsed);
+      return parsed;
     }
+  }
+
+  const localItems = getLocalStorageEvents();
+  if (localItems.length > 0) {
+    return localItems.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   return [...savedEvents].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -303,6 +330,9 @@ export async function saveEvent(data: {
   };
 
   savedEvents.unshift(newEvent);
+
+  const localBefore = getLocalStorageEvents();
+  setLocalStorageEvents([newEvent, ...localBefore.filter((e) => e.id !== newEvent.id)]);
 
   if (isSupabaseConfigured && supabase) {
     const fullPayload: any = {
@@ -352,6 +382,10 @@ export async function updateEventStatus(eventId: string, newStatus: SavedEventSt
     };
   }
 
+  const localItems = getLocalStorageEvents();
+  const updatedLocal = localItems.map((e) => e.id === eventId ? { ...e, status: newStatus, updatedAt: new Date().toISOString() } : e);
+  setLocalStorageEvents(updatedLocal);
+
   if (isSupabaseConfigured && supabase) {
     await supabase
       .from("events")
@@ -359,11 +393,15 @@ export async function updateEventStatus(eventId: string, newStatus: SavedEventSt
       .eq("id", eventId);
   }
 
-  return savedEvents[index] || savedEvents[0];
+  return savedEvents[index] || updatedLocal.find((e) => e.id === eventId) || savedEvents[0];
 }
 
 export async function deleteSavedEvent(eventId: string): Promise<void> {
   savedEvents = savedEvents.filter((e) => e.id !== eventId);
+
+  const localItems = getLocalStorageEvents();
+  setLocalStorageEvents(localItems.filter((e) => e.id !== eventId));
+
   if (isSupabaseConfigured && supabase) {
     await supabase.from("events").delete().eq("id", eventId);
   }
