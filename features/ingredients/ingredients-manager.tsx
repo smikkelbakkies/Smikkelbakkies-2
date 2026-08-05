@@ -1,7 +1,7 @@
 "use client";
 
 import { Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
-import { deleteIngredientFromDb, hasDuplicateIngredientName, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
+import { deleteIngredientFromDb, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
 import type { Ingredient, IngredientCategory, Supplier, BaseUnit } from "@/types/core";
 
 const baseUnits: BaseUnit[] = ["stuk", "gram", "kg", "ml", "liter", "portie"];
@@ -26,6 +26,21 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const { notify } = useToast();
+
+  const loadData = async () => {
+    try {
+      const data = await listIngredients();
+      if (data && data.length > 0) {
+        setItems(data);
+      }
+    } catch (e) {
+      console.error("Fout bij laden ingredienten op client:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filtered = useMemo(() => {
     return items
@@ -77,6 +92,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
     setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
     setFormOpen(false);
     notify({ title: editing ? "Ingrediënt bijgewerkt in Database" : "Ingrediënt opgeslagen in Database" });
+    await loadData();
   };
 
   const removeIngredient = async (ingredient: Ingredient) => {
@@ -84,6 +100,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
     await deleteIngredientFromDb(ingredient.id);
     setItems((current) => current.map((item) => item.id === ingredient.id ? { ...item, deletedAt: new Date().toISOString(), isActive: false } : item));
     notify({ title: "Ingrediënt verwijderd uit Database" });
+    await loadData();
   };
 
   return (

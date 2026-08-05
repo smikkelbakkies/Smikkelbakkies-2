@@ -1,7 +1,7 @@
 "use client";
 
 import { Edit3, ExternalLink, Mail, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,8 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import type { Supplier } from "@/types/core";
-
-import { deleteSupplierFromDb, saveSupplierToDb } from "@/services/suppliers.service";
+import { deleteSupplierFromDb, listSuppliers, saveSupplierToDb } from "@/services/suppliers.service";
 
 type SupplierForm = Omit<Supplier, "createdAt" | "updatedAt" | "deletedAt">;
 
@@ -21,6 +20,21 @@ export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Suppl
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState("");
   const { notify } = useToast();
+
+  const loadData = async () => {
+    try {
+      const data = await listSuppliers();
+      if (data && data.length > 0) {
+        setItems(data);
+      }
+    } catch (e) {
+      console.error("Fout bij laden leveranciers op client:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filtered = useMemo(() => {
     return items
@@ -48,6 +62,7 @@ export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Suppl
     setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
     setFormOpen(false);
     notify({ title: editing ? "Leverancier bijgewerkt in Database" : "Leverancier opgeslagen in Database" });
+    await loadData();
   };
 
   const removeSupplier = async (supplier: Supplier) => {
@@ -55,6 +70,7 @@ export function SuppliersManager({ initialSuppliers }: { initialSuppliers: Suppl
     await deleteSupplierFromDb(supplier.id);
     setItems((current) => current.map((item) => item.id === supplier.id ? { ...item, deletedAt: new Date().toISOString(), isActive: false } : item));
     notify({ title: "Leverancier verwijderd uit Database" });
+    await loadData();
   };
 
   return (
