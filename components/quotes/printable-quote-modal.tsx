@@ -106,7 +106,7 @@ export function PrintableQuoteModal({
 
         {/* Editable fields drawer */}
         {isEditing && (
-          <div className="rounded-lg border bg-muted/40 p-4 grid grid-cols-3 gap-3 text-xs">
+          <div className="rounded-lg border bg-muted/40 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
               <label className="block font-medium mb-1">Klant / Bedrijfsnaam</label>
               <Input value={clientName} onChange={(e) => setClientName(e.target.value)} />
@@ -135,7 +135,8 @@ export function PrintableQuoteModal({
         )}
 
         {/* Live A4 Print Sheet Container */}
-        <div className="printable-quote-sheet bg-white text-black font-sans text-xs p-8 rounded-lg shadow-md border print:shadow-none print:border-none print:p-0 print:m-0 print:w-full space-y-6">
+        <div className="overflow-x-auto rounded-lg">
+          <div className="printable-quote-sheet min-w-[650px] bg-white text-black font-sans text-xs p-6 sm:p-8 rounded-lg shadow-md border print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:min-w-0 space-y-6">
           
           {/* Header Row */}
           <div className="flex justify-between items-start">
@@ -296,6 +297,7 @@ export function PrintableQuoteModal({
             </div>
           </div>
 
+          </div>
         </div>
 
         {/* Modal Footer Controls */}

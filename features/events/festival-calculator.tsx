@@ -99,7 +99,7 @@ export function FestivalCalculator() {
             </div>
 
             {/* Sales & Pricing */}
-            <div className="grid grid-cols-2 gap-4 rounded-xl border bg-muted/30 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border bg-muted/30 p-4">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
                   Verwachte Verkoop (Aantal Burgers)
@@ -131,7 +131,7 @@ export function FestivalCalculator() {
             </div>
 
             {/* Stand Fee & Afdracht */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
                   <Store className="h-3.5 w-3.5 text-gold" /> Vast Standgeld (€)
@@ -163,7 +163,7 @@ export function FestivalCalculator() {
               <span className="block text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-gold" /> Urenopbouw (per Vennoot op locatie)
               </span>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] text-muted-foreground mb-1">Reistijd (Heen/Terug)</label>
                   <Input
@@ -198,7 +198,7 @@ export function FestivalCalculator() {
             </div>
 
             {/* Logistics */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
                   <Fuel className="h-3.5 w-3.5 text-gold" /> Kilometers (Heen + Terug)

@@ -280,7 +280,7 @@ export function EventCalculator() {
                 <span className="block text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-gold" /> Urenopbouw (per Vennoot op locatie)
                 </span>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] text-muted-foreground mb-1">Reistijd (Heen/Terug)</label>
                     <Input
@@ -315,7 +315,7 @@ export function EventCalculator() {
               </div>
 
               {/* Logistics & Fixed Costs */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
                     <Fuel className="h-3.5 w-3.5 text-gold" /> Kilometers (Totaal)
@@ -357,7 +357,7 @@ export function EventCalculator() {
                 <label className="block text-xs font-medium text-muted-foreground mb-2">
                   Event Winstmarge Preset (Na Directe Kosten)
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {EVENT_MARGIN_PRESETS.map((margin) => (
                     <Button
                       key={margin}
@@ -442,7 +442,7 @@ export function EventCalculator() {
                 </div>
 
                 {/* Action Buttons for Customer Quote & Saving Event */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t">
                   <Button
                     size="sm"
                     variant={copiedQuote ? "default" : "secondary"}

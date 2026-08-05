@@ -65,10 +65,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       <ToastProvider>
         <div className="min-h-screen premium-grid">
           <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+          
+          {/* Mobile backdrop */}
+          {mobileOpen && (
+            <div
+              className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
+              onClick={() => setMobileOpen(false)}
+            />
+          )}
+
           <aside
             className={cn(
-              "fixed inset-y-0 left-0 z-30 w-72 border-r bg-background/92 p-4 backdrop-blur-xl transition lg:translate-x-0",
-              mobileOpen ? "translate-x-0" : "-translate-x-full"
+              "fixed inset-y-0 left-0 z-30 w-72 border-r bg-background/95 p-4 backdrop-blur-xl transition-transform duration-300 ease-in-out lg:translate-x-0",
+              mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
             )}
           >
             <div className="flex items-center justify-between">
