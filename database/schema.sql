@@ -110,6 +110,10 @@ create table if not exists public.events (
   setup_hours numeric(8, 2) default 0,
   fixed_costs numeric(12, 2) default 0,
   target_event_margin numeric(5, 2) default 30,
+  status text not null default 'concept',
+  notes text,
+  params jsonb,
+  calculation jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

@@ -287,7 +287,7 @@ export async function saveEvent(data: {
   calculation: EventCalculationResult;
 }): Promise<SavedEvent> {
   const newEvent: SavedEvent = {
-    id: `event-${crypto.randomUUID()}`,
+    id: crypto.randomUUID(),
     eventName: data.eventName || `Catering ${data.clientName}`,
     eventDate: data.eventDate || new Date().toISOString().split("T")[0],
     clientName: data.clientName || "Opdrachtgever",
@@ -302,10 +302,10 @@ export async function saveEvent(data: {
     updatedAt: new Date().toISOString()
   };
 
-  savedEvents.push(newEvent);
+  savedEvents.unshift(newEvent);
 
   if (isSupabaseConfigured && supabase) {
-    await supabase.from("events").upsert({
+    const fullPayload: any = {
       id: newEvent.id,
       name: newEvent.eventName,
       event_date: newEvent.eventDate,
@@ -316,12 +316,27 @@ export async function saveEvent(data: {
       setup_hours: newEvent.params.setupHours,
       fixed_costs: newEvent.params.fixedCosts,
       target_event_margin: newEvent.params.targetEventMargin,
+      status: newEvent.status,
+      notes: newEvent.notes,
       params: newEvent.params,
       calculation: newEvent.calculation,
-      status: newEvent.status,
       created_at: newEvent.createdAt,
       updated_at: newEvent.updatedAt
-    });
+    };
+
+    let { error } = await supabase.from("events").upsert(fullPayload);
+
+    if (error) {
+      delete fullPayload.status;
+      delete fullPayload.notes;
+      delete fullPayload.params;
+      delete fullPayload.calculation;
+
+      const fallback = await supabase.from("events").upsert(fullPayload);
+      if (fallback.error) {
+        console.error("Supabase event save fallback error:", fallback.error);
+      }
+    }
   }
 
   return newEvent;
