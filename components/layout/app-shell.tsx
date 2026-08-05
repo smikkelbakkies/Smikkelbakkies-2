@@ -34,6 +34,8 @@ const pageLabels: Record<string, string> = {
   "/settings": "Instellingen"
 };
 
+import { APP_VERSION } from "@/lib/version";
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -100,12 +102,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               })}
             </nav>
 
-            <div className="absolute bottom-4 left-4 right-4 rounded-xl border bg-card/70 p-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <BarChart3 className="h-4 w-4 text-gold" />
-                VOF Smikkelbakkies
+            <div className="absolute bottom-4 left-4 right-4 rounded-xl border bg-card/70 p-4 space-y-1">
+              <div className="flex items-center justify-between text-sm font-medium">
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-gold" /> VOF Smikkelbakkies
+                </span>
+                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold border border-gold/30">{APP_VERSION}</span>
               </div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">Receptuur, food cost, event rekenmodel & uurverdienste voor 2 vennoten.</p>
+              <p className="text-xs leading-5 text-muted-foreground">Receptuur, food cost, event rekenmodel & uurverdienste voor 2 vennoten.</p>
             </div>
           </aside>
 
@@ -117,7 +121,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Menu className="h-4 w-4" />
                   </Button>
                   <div>
-                    <div className="text-xs text-muted-foreground">Smikkelbakkies / {currentPage}</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Smikkelbakkies / {currentPage}</span>
+                      <span className="rounded-md bg-gold/10 px-1.5 py-0.5 text-[10px] font-semibold text-gold border border-gold/20">{APP_VERSION}</span>
+                    </div>
                     <h1 className="text-lg font-semibold">{currentPage}</h1>
                   </div>
                 </div>
