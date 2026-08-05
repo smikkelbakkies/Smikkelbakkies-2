@@ -70,3 +70,37 @@ textarea {
     linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
   background-size: 44px 44px;
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-quote-sheet,
+  .printable-quote-sheet * {
+    visibility: visible !important;
+  }
+
+  .printable-quote-sheet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20mm 15mm !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+

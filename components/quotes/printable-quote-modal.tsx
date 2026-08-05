@@ -1,7 +1,9 @@
 "use client";
 
-import { Printer, X } from "lucide-react";
+import { useState } from "react";
+import { Printer, X, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { EventCalculationResult, EventPackageParams, ProductWithCost } from "@/types/core";
 
@@ -11,9 +13,7 @@ interface PrintableQuoteModalProps {
   params: EventPackageParams;
   result: EventCalculationResult;
   products: ProductWithCost[];
-  clientName?: string;
-  eventName?: string;
-  quoteDate?: string;
+  defaultClientName?: string;
 }
 
 export function PrintableQuoteModal({
@@ -22,31 +22,58 @@ export function PrintableQuoteModal({
   params,
   result,
   products,
-  clientName = "Gewaardeerde Klant",
-  eventName = "Catering Event",
-  quoteDate = new Date().toISOString().split("T")[0]
+  defaultClientName = ""
 }: PrintableQuoteModalProps) {
+  const [clientName, setClientName] = useState(defaultClientName || "Bedrijfsnaam / Klantnaam");
+  const [contactPerson, setContactPerson] = useState("T.a.v. Afdeling / Contactpersoon");
+  const [clientAddress, setClientAddress] = useState("Straat en huisnummer");
+  const [clientCity, setClientCity] = useState("Postcode en plaats");
+  const [eventDate, setEventDate] = useState(new Date().toISOString().split("T")[0]);
+  const [quoteNumber, setQuoteNumber] = useState(`OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`);
+  const [isEditing, setIsEditing] = useState(false);
+
   if (!open) return null;
 
   const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const totalBurgersToBake = Math.round(
+    params.peopleCount * params.selectedProducts.reduce((acc, p) => acc + (p.quantityPerPerson || 0), 0)
+  );
+
+  // Calculations for 9% BTW catering rate
+  const subtotalExclVat = result.advisedPackagePrice;
+  const vatRate = 0.09; // 9% laag tarief op catering/voeding in NL
+  const vatAmount = subtotalExclVat * vatRate;
+  const totalInclVat = subtotalExclVat + vatAmount;
 
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="relative w-full max-w-3xl rounded-xl border bg-background p-8 shadow-2xl space-y-6 print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none print:bg-white print:text-black">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
+      <div className="relative w-full max-w-4xl rounded-xl border bg-background shadow-2xl space-y-4 no-print p-6 print:hidden">
         
-        {/* Action Header (Hidden when printing) */}
-        <div className="flex items-center justify-between border-b pb-4 print:hidden">
+        {/* Controls Header */}
+        <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-base">📄 Offerte PDF Preview</span>
-            <span className="text-xs text-muted-foreground">(Klaar om direct af te drukken of als PDF op te slaan)</span>
+            <span className="font-semibold text-base flex items-center gap-2">
+              📄 Offerte PDF Preview (Smikkelbakkies Template)
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsEditing(!isEditing)}
+              className="h-7 text-xs"
+            >
+              <Edit2 className="mr-1 h-3.5 w-3.5 text-gold" />
+              {isEditing ? "Sluit Gegevens Bewerken" : "Klantgegevens Bewerken"}
+            </Button>
           </div>
+
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handlePrint} className="bg-gold text-background font-semibold hover:bg-gold/90">
-              <Printer className="mr-1.5 h-4 w-4" /> Afdrukken / Opslaan als PDF
+              <Printer className="mr-1.5 h-4 w-4" /> Offerte PDF Genereren / Afdrukken
             </Button>
             <Button size="sm" variant="ghost" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -54,91 +81,194 @@ export function PrintableQuoteModal({
           </div>
         </div>
 
-        {/* Printable Document Sheet (A4 Styling) */}
-        <div className="space-y-6 text-foreground print:text-black font-sans">
+        {/* Editable fields drawer */}
+        {isEditing && (
+          <div className="rounded-lg border bg-muted/40 p-4 grid grid-cols-3 gap-3 text-xs">
+            <div>
+              <label className="block font-medium mb-1">Klant / Bedrijfsnaam</label>
+              <Input value={clientName} onChange={(e) => setClientName(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">T.a.v. Contactpersoon</label>
+              <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Straat + Huisnummer</label>
+              <Input value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Postcode + Plaats</label>
+              <Input value={clientCity} onChange={(e) => setClientCity(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Event Datum</label>
+              <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Offertenummer</label>
+              <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* Live A4 Print Sheet Container */}
+        <div className="printable-quote-sheet bg-white text-black font-sans text-xs p-8 rounded-lg shadow-md border print:shadow-none print:border-none print:p-0 print:m-0 print:w-full space-y-6">
           
-          {/* Briefpapier Header */}
-          <div className="flex justify-between items-start border-b-2 border-gold/40 pb-6 print:border-black">
+          {/* Header Row */}
+          <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-extrabold tracking-wider text-gold print:text-black">SMIKKELBAKKIES</h1>
-              <p className="text-xs text-muted-foreground print:text-gray-600 mt-0.5">Vers Gebakken Burgers & Quality Catering VOF</p>
+              <h1 className="text-3xl font-bold tracking-tight text-black">OFFERTE</h1>
             </div>
-            <div className="text-right text-xs space-y-1">
-              <p className="font-semibold text-sm text-foreground print:text-black">OFFERTE</p>
-              <p className="text-muted-foreground print:text-gray-600">Offertekenmerk: <strong className="text-foreground print:text-black">OFF-{new Date().getFullYear()}-{(Math.floor(Math.random() * 8999) + 1000)}</strong></p>
-              <p className="text-muted-foreground print:text-gray-600">Datum: <strong className="text-foreground print:text-black">{formatDate(quoteDate)}</strong></p>
+
+            <div className="text-right text-[11px] leading-relaxed text-black font-medium">
+              <p className="font-bold text-sm">Smikkelbakkies VOF</p>
+              <p>Copernicusstraat 34</p>
+              <p>4816 CB Breda</p>
+              <p className="mt-1">T: 0626685035</p>
+              <p>M: smikkelbakkies@gmail.com</p>
+              <p className="mt-1">KvK: 42131023</p>
             </div>
           </div>
 
-          {/* Client & Event Info Box */}
-          <div className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/20 p-4 text-xs print:border-gray-300 print:bg-gray-50">
-            <div>
-              <span className="font-bold text-muted-foreground print:text-gray-700 block mb-1">OPDRACHTGEVER</span>
-              <p className="font-semibold text-sm text-foreground print:text-black">{clientName}</p>
-              <p className="text-muted-foreground print:text-gray-600">Betreft: {eventName}</p>
+          {/* Client Box & Metadata Row */}
+          <div className="grid grid-cols-2 gap-8 pt-2">
+            <div className="space-y-1">
+              <span className="font-bold text-black uppercase tracking-wider block">AAN</span>
+              <p className="font-bold text-sm text-black">{clientName}</p>
+              <p>{contactPerson}</p>
+              <p>{clientAddress}</p>
+              <p>{clientCity}</p>
             </div>
-            <div className="text-right">
-              <span className="font-bold text-muted-foreground print:text-gray-700 block mb-1">CATERING LOCATIE & DUUR</span>
-              <p className="font-semibold text-foreground print:text-black">{params.peopleCount} Personen / Gasten</p>
-              <p className="text-muted-foreground print:text-gray-600">{params.serviceHours} uur verse bereiding op locatie vanuit de foodtruck</p>
+
+            <div className="space-y-1 text-xs">
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <span className="font-bold">Datum:</span>
+                <span>{formatDate(new Date().toISOString())}</span>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <span className="font-bold">Offertenummer:</span>
+                <span>{quoteNumber}</span>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <span className="font-bold">Geldigheid:</span>
+                <span>30 dagen</span>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <span className="font-bold">Leverdatum:</span>
+                <span>{formatDate(eventDate)}</span>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <span className="font-bold">Uw referentie:</span>
+                <span>Foodtruck Catering ({params.peopleCount} gasten)</span>
+              </div>
             </div>
           </div>
 
-          {/* Burger Specification Table */}
-          <div className="space-y-2">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground print:text-gray-700">Arrangement & Burger Samenstelling</h3>
-            <table className="w-full text-xs text-left border-collapse">
+          {/* Quotation Table */}
+          <div className="pt-4">
+            <table className="w-full text-xs text-left border-collapse border-b-2 border-black">
               <thead>
-                <tr className="border-b border-muted bg-muted/40 print:border-gray-300 print:bg-gray-100">
-                  <th className="p-2.5 font-bold">Omschrijving</th>
-                  <th className="p-2.5 font-bold text-center">Gasten</th>
-                  <th className="p-2.5 font-bold text-center">Burger p.p.</th>
-                  <th className="p-2.5 font-bold text-right">Totaal Burgers</th>
+                <tr className="border-b-2 border-black font-bold uppercase text-[11px]">
+                  <th className="py-2 pr-2">Product / Omschrijving</th>
+                  <th className="py-2 px-2">Artikelnummer</th>
+                  <th className="py-2 px-2 text-center">Aantal</th>
+                  <th className="py-2 px-2 text-right">Tarief (excl. btw)</th>
+                  <th className="py-2 px-2 text-center">BTW</th>
+                  <th className="py-2 pl-2 text-right">Bedrag (excl. btw)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-muted/40 print:divide-gray-200">
+              <tbody className="divide-y divide-gray-300">
+                {/* Main Catering Package Row */}
+                <tr>
+                  <td className="py-3 pr-2 font-medium">
+                    <span className="font-bold block text-sm">Foodtruck Catering Arrangement</span>
+                    <span className="text-[11px] text-gray-600 block">
+                      Catering op locatie voor {params.peopleCount} personen ({params.serviceHours} uur bereiding vanuit de foodtruck).
+                    </span>
+                  </td>
+                  <td className="py-3 px-2 text-gray-500 font-mono">CAT-{params.peopleCount}P</td>
+                  <td className="py-3 px-2 text-center font-bold">1,00</td>
+                  <td className="py-3 px-2 text-right">{formatCurrency(subtotalExclVat)}</td>
+                  <td className="py-3 px-2 text-center">9%</td>
+                  <td className="py-3 pl-2 text-right font-bold">{formatCurrency(subtotalExclVat)}</td>
+                </tr>
+
+                {/* Burger Specifications */}
                 {params.selectedProducts.map((row, idx) => {
                   const prod = productMap.get(row.productId);
                   const count = Math.round(row.quantityPerPerson * params.peopleCount);
                   return (
-                    <tr key={idx}>
-                      <td className="p-2.5 font-semibold text-foreground print:text-black">
-                        {prod ? prod.name : "Smikkelburger"}
-                        <span className="block text-[10px] text-muted-foreground print:text-gray-600 font-normal">
-                          {prod?.description || "Ambachtelijke verse burger gebakken op locatie."}
+                    <tr key={idx} className="bg-gray-50/50">
+                      <td className="py-2.5 pr-2 pl-4">
+                        <span className="font-bold block">• {prod ? prod.name : "Smikkelburger"} ({row.quantityPerPerson} p.p.)</span>
+                        <span className="text-[10px] text-gray-500">
+                          {prod?.description || "Vers gebakken ambachtelijke burger op locatie."}
                         </span>
                       </td>
-                      <td className="p-2.5 text-center">{params.peopleCount} personen</td>
-                      <td className="p-2.5 text-center">{row.quantityPerPerson} p.p.</td>
-                      <td className="p-2.5 text-right font-bold">{count}x stuks</td>
+                      <td className="py-2.5 px-2 text-gray-500 font-mono">{prod?.sku || "SMK-01"}</td>
+                      <td className="py-2.5 px-2 text-center">{count},00 stuks</td>
+                      <td className="py-2.5 px-2 text-right text-gray-500">Inbegrepen</td>
+                      <td className="py-2.5 px-2 text-center text-gray-500">9%</td>
+                      <td className="py-2.5 pl-2 text-right text-gray-500">Inbegrepen</td>
                     </tr>
                   );
                 })}
+
+                {/* Service & Logistics */}
+                <tr>
+                  <td className="py-2.5 pr-2 pl-4">
+                    <span className="font-bold block">• Logistiek, Reiskosten & Disposables</span>
+                    <span className="text-[10px] text-gray-500">
+                      Inclusief {params.distanceKm} km reiskosten, op- en afbouw, servies, servetten en gastvrije bediening.
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-2 text-gray-500 font-mono">LOG-KM</td>
+                  <td className="py-2.5 px-2 text-center">1,00 pakket</td>
+                  <td className="py-2.5 px-2 text-right text-gray-500">Inbegrepen</td>
+                  <td className="py-2.5 px-2 text-center text-gray-500">9%</td>
+                  <td className="py-2.5 pl-2 text-right text-gray-500">Inbegrepen</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
-          {/* What's Included Bullet Points */}
-          <div className="rounded-lg border bg-muted/10 p-3 text-xs space-y-1 text-muted-foreground print:border-gray-300 print:bg-gray-50 print:text-gray-700">
-            <span className="font-bold text-foreground print:text-black block mb-1">Bij de prijs inbegrepen:</span>
-            <p>• Vers bereide burgers vanuit onze professionele foodtruck op locatie.</p>
-            <p>• Reiskosten ({params.distanceKm} km), op- en afbouw van de stand.</p>
-            <p>• Servies, disposables, servetten en gastvrije bediening.</p>
+          {/* Totals Block */}
+          <div className="flex justify-end pt-2">
+            <div className="w-72 space-y-1.5 text-xs">
+              <div className="flex justify-between py-1 border-b">
+                <span>Subtotaal (excl. btw):</span>
+                <span className="font-bold">{formatCurrency(subtotalExclVat)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b">
+                <span>BTW (9%):</span>
+                <span>{formatCurrency(vatAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b-2 border-black font-extrabold text-sm">
+                <span>Totaal EURO (incl. btw):</span>
+                <span>{formatCurrency(totalInclVat)}</span>
+              </div>
+              <div className="flex justify-between pt-1 text-[11px] text-gray-600">
+                <span>Prijs per persoon:</span>
+                <span className="font-bold">{formatCurrency(result.pricePerPerson)} p.p.</span>
+              </div>
+            </div>
           </div>
 
-          {/* Pricing Total Summary */}
-          <div className="border-t-2 border-gold/40 pt-4 flex justify-between items-end print:border-black">
-            <div className="text-[11px] text-muted-foreground print:text-gray-600 space-y-0.5">
-              <p>Prijzen zijn exclusief geldende btw en 30 dagen geldig.</p>
-              <p>Smikkelbakkies VOF • KvK: 81234567 • btw: NL001234567B01</p>
+          {/* Acceptance Signatures Block */}
+          <div className="grid grid-cols-2 gap-12 pt-8 text-xs border-t">
+            <div className="space-y-4">
+              <span className="font-bold block">Voor akkoord opdrachtgever</span>
+              <div className="space-y-2 text-[11px]">
+                <p>Datum, Plaats: ___________________________</p>
+                <p className="pt-6">Handtekening: ________________________</p>
+              </div>
             </div>
 
-            <div className="text-right space-y-1">
-              <div className="text-xs text-muted-foreground print:text-gray-700">
-                Prijs per persoon: <strong className="text-foreground print:text-black">{formatCurrency(result.pricePerPerson)} p.p.</strong>
-              </div>
-              <div className="text-xl font-extrabold text-gold print:text-black">
-                Totaalbedrag: {formatCurrency(result.advisedPackagePrice)} <span className="text-xs font-normal text-muted-foreground print:text-gray-600">(excl. btw)</span>
+            <div className="space-y-4">
+              <span className="font-bold block">Voor akkoord opdrachtnemer</span>
+              <div className="space-y-2 text-[11px]">
+                <p>Datum, Plaats: Breda, {formatDate(new Date().toISOString())}</p>
+                <p className="pt-6 font-bold">Smikkelbakkies VOF</p>
               </div>
             </div>
           </div>
