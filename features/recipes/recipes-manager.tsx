@@ -119,9 +119,11 @@ export function RecipesManager() {
           name: formName,
           sku: formSku,
           description: formDescription,
+          parentProductId: null,
           targetGrossMargin: formMargin,
           actualSellingPrice: formSellingPrice,
-          ingredients: formIngredients
+          ingredients: formIngredients,
+          isActive: true
         });
         notify({ title: "Nieuwe burger toegevoegd!" });
       }

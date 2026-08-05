@@ -1,4 +1,4 @@
-import { calculateGrossMargin, calculateUnitPrice } from "@/lib/utils";
+import { calculateGrossMargin, calculateUnitPrice, ensureValidUuid } from "@/lib/utils";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import type { Ingredient, Product, ProductIngredientItem, ProductWithCost } from "@/types/core";
 import { listIngredients } from "@/services/ingredients.service";
@@ -47,11 +47,30 @@ let initialProducts: Product[] = [
   }
 ];
 
+function getLocalStorageProducts(): Product[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("smikkel_products");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setLocalStorageProducts(items: Product[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("smikkel_products", JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export async function listProducts(): Promise<ProductWithCost[]> {
   const allIngredients = await listIngredients();
   const ingredientMap = new Map<string, Ingredient>(allIngredients.map((item) => [item.id, item]));
 
-  let rawProducts = initialProducts;
+  let rawProducts: Product[] = initialProducts;
 
   if (isSupabaseConfigured && supabase) {
     const { data: dbProducts, error } = await supabase
@@ -78,6 +97,15 @@ export async function listProducts(): Promise<ProductWithCost[]> {
         updatedAt: p.updated_at,
         deletedAt: p.deleted_at
       }));
+
+      setLocalStorageProducts(rawProducts);
+    }
+  }
+
+  if (rawProducts === initialProducts) {
+    const localProducts = getLocalStorageProducts();
+    if (localProducts.length > 0) {
+      rawProducts = localProducts;
     }
   }
 
@@ -120,69 +148,65 @@ export function calculateProductWithCost(
     const ing = ingredientMap.get(item.ingredientId);
     if (ing) {
       const price = ing.pricePerBaseUnit || calculateUnitPrice(ing.purchasePrice, ing.packageContent);
-      const existing = effectiveIngredients.find((ei) => ei.ingredientId === ing.id && !ei.isInherited);
-      if (existing) {
-        existing.quantity += item.quantity;
-        existing.totalCost = existing.pricePerBaseUnit * existing.quantity;
-      } else {
-        effectiveIngredients.push({
-          ingredientId: ing.id,
-          name: ing.name,
-          quantity: item.quantity,
-          baseUnit: ing.baseUnit,
-          pricePerBaseUnit: price,
-          totalCost: price * item.quantity,
-          isInherited: false
-        });
-      }
+      effectiveIngredients.push({
+        ingredientId: ing.id,
+        name: ing.name,
+        quantity: item.quantity,
+        baseUnit: ing.baseUnit,
+        pricePerBaseUnit: price,
+        totalCost: price * item.quantity,
+        isInherited: false
+      });
     }
   }
 
-  const costPrice = effectiveIngredients.reduce((sum, item) => sum + item.totalCost, 0);
-  const marginFraction = Math.min(Math.max(product.targetGrossMargin, 10), 95) / 100;
-  const advisedSellingPrice = costPrice / (1 - marginFraction);
-  const actualGrossMargin = calculateGrossMargin(costPrice, product.actualSellingPrice);
+  const totalCostPrice = effectiveIngredients.reduce((acc, curr) => acc + curr.totalCost, 0);
+
+  const calculatedSellingPrice = totalCostPrice > 0 && product.targetGrossMargin < 100
+    ? totalCostPrice / (1 - product.targetGrossMargin / 100)
+    : 0;
+
+  const actualSellingPrice = product.actualSellingPrice && product.actualSellingPrice > 0
+    ? product.actualSellingPrice
+    : calculatedSellingPrice;
+
+  const actualGrossMargin = calculateGrossMargin(totalCostPrice, actualSellingPrice);
 
   return {
     ...product,
-    costPrice,
-    advisedSellingPrice,
+    costPrice: totalCostPrice,
+    advisedSellingPrice: calculatedSellingPrice,
+    actualSellingPrice,
     actualGrossMargin,
     effectiveIngredients
   };
 }
 
-export async function createProduct(data: {
-  name: string;
-  sku: string;
-  description?: string;
-  targetGrossMargin: number;
-  actualSellingPrice: number;
-  ingredients: ProductIngredientItem[];
-}): Promise<ProductWithCost> {
+export async function createProduct(
+  input: Omit<Product, "id" | "createdAt" | "updatedAt" | "deletedAt">
+): Promise<ProductWithCost> {
+  const timestamp = new Date().toISOString();
   const newProduct: Product = {
-    id: `prod-${crypto.randomUUID()}`,
-    name: data.name,
-    sku: data.sku || `SMK-${data.name.slice(0, 4).toUpperCase()}`,
-    description: data.description || "",
-    parentProductId: null,
-    targetGrossMargin: data.targetGrossMargin || 70,
-    actualSellingPrice: data.actualSellingPrice || 0,
-    ingredients: data.ingredients || [],
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    ...input,
+    id: ensureValidUuid(undefined),
+    createdAt: timestamp,
+    updatedAt: timestamp,
     deletedAt: null
   };
 
-  initialProducts.push(newProduct);
+  initialProducts.unshift(newProduct);
+
+  const local = getLocalStorageProducts();
+  setLocalStorageProducts([newProduct, ...local.filter((p) => p.id !== newProduct.id)]);
 
   if (isSupabaseConfigured && supabase) {
     await supabase.from("products").upsert({
       id: newProduct.id,
       name: newProduct.name,
       sku: newProduct.sku,
+      description: newProduct.description,
       target_gross_margin: newProduct.targetGrossMargin,
+      actual_selling_price: newProduct.actualSellingPrice,
       is_active: true
     });
   }
@@ -195,18 +219,25 @@ export async function updateProduct(
   productId: string,
   data: Partial<Product>
 ): Promise<ProductWithCost> {
+  const timestamp = new Date().toISOString();
   const index = initialProducts.findIndex((p) => p.id === productId);
   if (index !== -1) {
     initialProducts[index] = {
       ...initialProducts[index],
       ...data,
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     };
   }
 
+  const local = getLocalStorageProducts();
+  const updatedLocal = local.map((p) => p.id === productId ? { ...p, ...data, updatedAt: timestamp } : p);
+  setLocalStorageProducts(updatedLocal);
+
   if (isSupabaseConfigured && supabase) {
-    const payload: any = { id: productId, updated_at: new Date().toISOString() };
+    const payload: any = { id: productId, updated_at: timestamp };
     if (data.name) payload.name = data.name;
+    if (data.sku) payload.sku = data.sku;
+    if (data.description !== undefined) payload.description = data.description;
     if (data.actualSellingPrice !== undefined) payload.actual_selling_price = data.actualSellingPrice;
     if (data.targetGrossMargin !== undefined) payload.target_gross_margin = data.targetGrossMargin;
 
@@ -218,19 +249,24 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
+  const timestamp = new Date().toISOString();
   const index = initialProducts.findIndex((p) => p.id === productId);
   if (index !== -1) {
     initialProducts[index] = {
       ...initialProducts[index],
       isActive: false,
-      deletedAt: new Date().toISOString()
+      deletedAt: timestamp
     };
   }
+
+  const local = getLocalStorageProducts();
+  const filteredLocal = local.filter((p) => p.id !== productId);
+  setLocalStorageProducts(filteredLocal);
 
   if (isSupabaseConfigured && supabase) {
     await supabase
       .from("products")
-      .update({ deleted_at: new Date().toISOString(), is_active: false })
+      .update({ deleted_at: timestamp, is_active: false })
       .eq("id", productId);
   }
 }

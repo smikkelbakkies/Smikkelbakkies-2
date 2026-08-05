@@ -3,6 +3,25 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { categories as mockCategories, ingredients as mockIngredients } from "@/services/mock-data";
 import type { Ingredient, IngredientCategory } from "@/types/core";
 
+function getLocalStorageIngredients(): Ingredient[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("smikkel_ingredients");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setLocalStorageIngredients(items: Ingredient[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("smikkel_ingredients", JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export async function listIngredientCategories(): Promise<IngredientCategory[]> {
   if (!isSupabaseConfigured || !supabase) {
     return mockCategories;
@@ -34,52 +53,43 @@ export async function listIngredientCategories(): Promise<IngredientCategory[]> 
 }
 
 export async function listIngredients(): Promise<Ingredient[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return mockIngredients;
-  }
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from("ingredients")
+      .select("*")
+      .is("deleted_at", null)
+      .order("name");
 
-  const { data, error } = await supabase
-    .from("ingredients")
-    .select("*")
-    .is("deleted_at", null)
-    .order("name");
+    if (!error && data && data.length > 0) {
+      const parsed: Ingredient[] = data.map((item) => ({
+        id: item.id,
+        name: item.name,
+        categoryId: item.category_id,
+        primarySupplierId: item.primary_supplier_id,
+        supplierArticleCode: item.supplier_article_code || undefined,
+        baseUnit: item.base_unit,
+        purchaseUnit: item.purchase_unit,
+        packageContent: Number(item.package_content),
+        purchasePrice: Number(item.purchase_price),
+        pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
+        lastPriceUpdate: item.last_price_update || item.created_at,
+        isActive: item.is_active,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        deletedAt: item.deleted_at
+      }));
 
-  if (error || !data || data.length === 0) {
-    if (supabase) {
-      for (const ing of mockIngredients) {
-        await supabase.from("ingredients").upsert({
-          id: ing.id,
-          name: ing.name,
-          category_id: ing.categoryId,
-          primary_supplier_id: ing.primarySupplierId,
-          base_unit: ing.baseUnit,
-          purchase_unit: ing.purchaseUnit,
-          package_content: ing.packageContent,
-          purchase_price: ing.purchasePrice,
-          is_active: ing.isActive
-        });
-      }
+      setLocalStorageIngredients(parsed);
+      return parsed;
     }
-    return mockIngredients;
   }
 
-  return data.map((item) => ({
-    id: item.id,
-    name: item.name,
-    categoryId: item.category_id,
-    primarySupplierId: item.primary_supplier_id,
-    supplierArticleCode: item.supplier_article_code || undefined,
-    baseUnit: item.base_unit,
-    purchaseUnit: item.purchase_unit,
-    packageContent: Number(item.package_content),
-    purchasePrice: Number(item.purchase_price),
-    pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
-    lastPriceUpdate: item.last_price_update || item.created_at,
-    isActive: item.is_active,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
-    deletedAt: item.deleted_at
-  }));
+  const localItems = getLocalStorageIngredients();
+  if (localItems.length > 0) {
+    return localItems.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  return mockIngredients;
 }
 
 export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingredient> {
@@ -101,6 +111,19 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     updatedAt: timestamp
   };
 
+  // LocalStorage persistence
+  const currentLocal = getLocalStorageIngredients();
+  const index = currentLocal.findIndex((i) => i.id === sanitizedIngredient.id);
+  let updatedLocal: Ingredient[];
+  if (index !== -1) {
+    updatedLocal = [...currentLocal];
+    updatedLocal[index] = sanitizedIngredient;
+  } else {
+    updatedLocal = [sanitizedIngredient, ...currentLocal];
+  }
+  setLocalStorageIngredients(updatedLocal);
+
+  // Supabase persistence
   if (isSupabaseConfigured && supabase) {
     const fullPayload: any = {
       id: sanitizedIngredient.id,
@@ -118,7 +141,6 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
 
     let { error } = await supabase.from("ingredients").upsert(fullPayload);
 
-    // Fallback if supplier_article_code column is not yet present on remote DB
     if (error) {
       delete fullPayload.supplier_article_code;
       const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
@@ -132,6 +154,12 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
 }
 
 export async function deleteIngredientFromDb(ingredientId: string): Promise<void> {
+  // LocalStorage persistence
+  const currentLocal = getLocalStorageIngredients();
+  const filtered = currentLocal.filter((i) => i.id !== ingredientId);
+  setLocalStorageIngredients(filtered);
+
+  // Supabase persistence
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase
       .from("ingredients")
