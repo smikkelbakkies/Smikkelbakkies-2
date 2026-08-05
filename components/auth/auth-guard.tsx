@@ -62,7 +62,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
               </label>
               <Input
                 type="password"
-                placeholder="PIN / Wachtwoord (Standaard: 4213)"
+                placeholder="PIN"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
                 className="font-mono text-center tracking-widest text-lg h-12"
