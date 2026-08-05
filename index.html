@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smikkelbakkies Margecalculator</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="hero">
+      <img src="assets/foodtruck-header.png" alt="" class="hero__image">
+      <div class="hero__shade"></div>
+      <div class="hero__content">
+        <p class="eyebrow">Smikkelbakkies</p>
+        <h1>Margecalculator</h1>
+        <p>Bereken verkoopprijzen voor burgers, ingredientkosten en groepspakketten voor foodtruck-events.</p>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="summary" aria-label="Samenvatting">
+        <div>
+          <span>Ingredienten</span>
+          <strong id="statIngredients">0</strong>
+        </div>
+        <div>
+          <span>Burgers</span>
+          <strong id="statBurgers">0</strong>
+        </div>
+        <div>
+          <span>Gem. marge</span>
+          <strong id="statMargin">0%</strong>
+        </div>
+        <div>
+          <span>Pakketten</span>
+          <strong id="statPackages">0</strong>
+        </div>
+        <div>
+          <span>Gem. winst/uur</span>
+          <strong id="statHourly">€ 0</strong>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Secties">
+        <button class="tab is-active" data-tab="ingredients" type="button">Ingredienten</button>
+        <button class="tab" data-tab="burgers" type="button">Burgers</button>
+        <button class="tab" data-tab="packages" type="button">Groepspakketten</button>
+      </nav>
+
+      <section class="panel is-active" id="ingredients">
+        <div class="panel__head">
+          <div>
+            <h2>Ingredienten</h2>
+            <p>Voer in wat een verpakking kost en hoeveel bruikbare eenheden erin zitten.</p>
+          </div>
+          <button class="primary" id="addIngredient" type="button">Ingredient toevoegen</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Naam</th>
+                <th>Verpakking kost</th>
+                <th>Aantal eenheden</th>
+                <th>Eenheid</th>
+                <th>Kost per eenheid</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="ingredientsRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="burgers">
+        <div class="panel__head">
+          <div>
+            <h2>Burgers</h2>
+            <p>Stel recepten samen en bereken de verkoopprijs op basis van doelmarge of vaste verkoopprijs.</p>
+          </div>
+          <button class="primary" id="addBurger" type="button">Burger toevoegen</button>
+        </div>
+        <div class="guidance">
+          <strong>Logische productmarges</strong>
+          <span>Een gezonde foodtruck-prijs begint vaak bij 28-35% food cost. Dat komt neer op ongeveer 65-72% brutomarge voordat alle vaste bedrijfskosten zijn betaald.</span>
+        </div>
+        <div class="cards" id="burgerCards"></div>
+      </section>
+
+      <section class="panel" id="packages">
+        <div class="panel__head">
+          <div>
+            <h2>Groepspakketten</h2>
+            <p>Bereken pakketten per aantal personen, inclusief vaste opstartkosten, reistijd en winst per gewerkt uur.</p>
+          </div>
+          <button class="primary" id="addPackage" type="button">Pakket toevoegen</button>
+        </div>
+        <div class="guidance">
+          <strong>Logische eventmarges</strong>
+          <span>Voor events is 30-45% marge na directe kosten vaak gezonder dan alleen sturen op ingredientmarge. Kijk daarom ook naar winst per totaal uur, inclusief rijden, opbouw en afbouw.</span>
+        </div>
+        <div class="cards" id="packageCards"></div>
+      </section>
+    </main>
+
+    <template id="ingredientRowTemplate">
+      <tr>
+        <td><input data-field="name" aria-label="Ingredientnaam"></td>
+        <td><input data-field="packagePrice" type="number" min="0" step="0.01" aria-label="Verpakking kost"></td>
+        <td><input data-field="packageQuantity" type="number" min="0.001" step="0.001" aria-label="Aantal eenheden"></td>
+        <td><input data-field="unit" aria-label="Eenheid"></td>
+        <td class="money" data-value="unitCost"></td>
+        <td><button class="icon-button danger" data-action="remove" type="button" aria-label="Verwijder ingredient">x</button></td>
+      </tr>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 38 18% 94%;
+  --foreground: 32 14% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 32 14% 8%;
+  --muted: 38 16% 88%;
+  --muted-foreground: 34 8% 42%;
+  --border: 36 15% 82%;
+  --input: 36 15% 82%;
+  --ring: 42 55% 58%;
+  --primary: 42 55% 58%;
+  --primary-foreground: 32 18% 8%;
+  --destructive: 4 72% 48%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 148 42% 42%;
+  --success-foreground: 0 0% 98%;
+  --gold: 42 55% 58%;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 30 11% 7%;
+  --foreground: 38 24% 92%;
+  --card: 32 10% 10%;
+  --card-foreground: 38 24% 92%;
+  --muted: 32 10% 14%;
+  --muted-foreground: 35 9% 64%;
+  --border: 35 10% 18%;
+  --input: 35 10% 18%;
+  --ring: 42 55% 58%;
+  --primary: 42 55% 58%;
+  --primary-foreground: 32 18% 8%;
+  --destructive: 4 66% 52%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 148 42% 42%;
+  --success-foreground: 0 0% 98%;
+  --gold: 42 55% 58%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(191, 157, 92, 0.14), transparent 34rem),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: hsl(var(--gold) / 0.35);
+}
+
+.premium-grid {
+  background-image:
+    linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+  background-size: 44px 44px;
+}

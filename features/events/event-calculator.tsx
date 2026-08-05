@@ -1,0 +1,664 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Trash2, Users, Utensils, Zap, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
+import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
+import { formatCurrency } from "@/lib/utils";
+import type { EventCalculationResult, EventPackageParams, ProductWithCost, SupplierOrderGroup } from "@/types/core";
+import { calculateEventPackage, generateCustomerQuoteText, generateEventOrderList, saveEvent } from "@/services/events.service";
+import { listProducts } from "@/services/recipes.service";
+
+const EVENT_MARGIN_PRESETS = [20, 30, 40, 45];
+const BURGER_QTY_PRESETS = [1.0, 1.25, 1.5, 2.0];
+
+export function EventCalculator() {
+  const [products, setProducts] = useState<ProductWithCost[]>([]);
+  const [params, setParams] = useState<EventPackageParams>({
+    peopleCount: 75,
+    selectedProducts: [],
+    travelHours: 1.5,
+    setupHours: 1.5,
+    serviceHours: 3.0,
+    distanceKm: 80,
+    costPerKm: 0.35,
+    fixedCosts: 75,
+    staffCosts: 0,
+    targetEventMargin: 30,
+    partnersCount: 2
+  });
+
+  const [result, setResult] = useState<EventCalculationResult | null>(null);
+  const [orderGroups, setOrderGroups] = useState<SupplierOrderGroup[]>([]);
+  const [copiedSupplierId, setCopiedSupplierId] = useState<string | null>(null);
+  const [copiedQuote, setCopiedQuote] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+
+  // Save Event Modal state
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveEventName, setSaveEventName] = useState("");
+  const [saveClientName, setSaveClientName] = useState("");
+  const [saveEventDate, setSaveEventDate] = useState("");
+  const [saveLocation, setSaveLocation] = useState("");
+
+  const { notify } = useToast();
+
+  useEffect(() => {
+    async function init() {
+      const prods = await listProducts();
+      setProducts(prods);
+      if (prods.length > 0) {
+        setParams((prev) => ({
+          ...prev,
+          selectedProducts: [{ productId: prods[0].id, quantityPerPerson: 1.5 }]
+        }));
+      }
+    }
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (params.selectedProducts.length > 0) {
+      calculateEventPackage(params).then(setResult);
+      generateEventOrderList(params.peopleCount, params.selectedProducts).then(setOrderGroups);
+    }
+  }, [params]);
+
+  const handleAddProductRow = () => {
+    if (products.length === 0) return;
+    setParams((prev) => ({
+      ...prev,
+      selectedProducts: [...prev.selectedProducts, { productId: products[0].id, quantityPerPerson: 1.0 }]
+    }));
+  };
+
+  const handleRemoveProductRow = (index: number) => {
+    setParams((prev) => ({
+      ...prev,
+      selectedProducts: prev.selectedProducts.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleProductRowChange = (index: number, field: "productId" | "quantityPerPerson", value: any) => {
+    setParams((prev) => {
+      const updated = [...prev.selectedProducts];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, selectedProducts: updated };
+    });
+  };
+
+  const totalBurgersToBake = Math.round(
+    params.peopleCount * params.selectedProducts.reduce((acc, p) => acc + (p.quantityPerPerson || 0), 0)
+  );
+
+  const handleCopyOrderList = (group: SupplierOrderGroup) => {
+    let text = `📋 BESTELLIJST SMIKKELBAKKIES\n`;
+    text += `Leverancier: ${group.supplierName}\n`;
+    text += `Event: ${params.peopleCount} gasten (${totalBurgersToBake} burgers totaal)\n`;
+    text += `----------------------------------------\n`;
+    group.items.forEach((item) => {
+      text += `• ${item.packagesToOrder}x ${item.purchaseUnit} ${item.ingredientName} (${item.packageContent} ${item.baseUnit}/unit)\n`;
+    });
+    text += `----------------------------------------\n`;
+    text += `Totale schatting inkoop: ${formatCurrency(group.totalGroupCost)}\n`;
+
+    navigator.clipboard.writeText(text);
+    setCopiedSupplierId(group.supplierId);
+    notify({ title: `Bestellijst voor ${group.supplierName} gekopieerd!` });
+    setTimeout(() => setCopiedSupplierId(null), 2500);
+  };
+
+  const handleCopyCustomerQuote = async () => {
+    if (!result) return;
+    const text = await generateCustomerQuoteText(params, result);
+    navigator.clipboard.writeText(text);
+    setCopiedQuote(true);
+    notify({ title: "Klantofferte gekopieerd! (klaar voor WhatsApp/E-mail)" });
+    setTimeout(() => setCopiedQuote(false), 2500);
+  };
+
+  const handleOpenSaveModal = () => {
+    setSaveEventName(`Catering ${params.peopleCount}p`);
+    setSaveClientName("");
+    setSaveEventDate(new Date().toISOString().split("T")[0]);
+    setSaveLocation("");
+    setSaveModalOpen(true);
+  };
+
+  const handleConfirmSaveEvent = async () => {
+    if (!result) return;
+    if (!saveClientName.trim()) {
+      notify({ title: "Vul een klantnaam in" });
+      return;
+    }
+
+    try {
+      await saveEvent({
+        eventName: saveEventName,
+        eventDate: saveEventDate,
+        clientName: saveClientName,
+        location: saveLocation,
+        params,
+        calculation: result
+      });
+      notify({ title: "Event opgeslagen in VOF Planningskalender!" });
+      setSaveModalOpen(false);
+    } catch {
+      notify({ title: "Fout bij opslaan event" });
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+        {/* Left Column: Calculator Controls */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Calculator className="h-5 w-5 text-gold" /> Event Parameters (VOF 2 Vennoten)
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Bereken adviesprijzen, pakketkosten en jullie uurverdienste voor catering en events.
+                  </p>
+                </div>
+                <Badge tone="neutral">2 Vennoten</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Guest Count */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-gold" /> Aantal Gasten / Personen op Event
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={params.peopleCount}
+                  onChange={(e) => setParams({ ...params, peopleCount: parseInt(e.target.value) || 0 })}
+                  className="font-semibold h-10 text-base"
+                />
+              </div>
+
+              {/* Dynamic Burgers & Quantities Per Person */}
+              <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Utensils className="h-3.5 w-3.5 text-gold" /> Menusamenstelling & Aantal Burgers p.p.
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Totaal te bakken: <strong className="text-gold font-bold">{totalBurgersToBake} burgers</strong> voor {params.peopleCount} gasten.
+                    </span>
+                  </div>
+                  <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={handleAddProductRow}>
+                    <Plus className="mr-1 h-3.5 w-3.5 text-gold" /> Burger Toevoegen
+                  </Button>
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  {params.selectedProducts.map((row, idx) => {
+                    const selectedProd = products.find((p) => p.id === row.productId);
+                    return (
+                      <div key={idx} className="flex items-center gap-2 rounded-lg border bg-background p-3 text-xs">
+                        <div className="flex-1 space-y-1">
+                          <label className="block text-[10px] text-muted-foreground">Selecteer Burger</label>
+                          <select
+                            value={row.productId}
+                            onChange={(e) => handleProductRowChange(idx, "productId", e.target.value)}
+                            className="w-full h-8 rounded border border-input bg-background px-2 text-xs font-medium focus:ring-1 focus:ring-gold"
+                          >
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} (Kostprijs: {formatCurrency(p.costPrice)})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="w-32 space-y-1">
+                          <label className="block text-[10px] text-muted-foreground">Aantal p.p.</label>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={row.quantityPerPerson}
+                              onChange={(e) => handleProductRowChange(idx, "quantityPerPerson", parseFloat(e.target.value) || 0)}
+                              className="h-8 text-xs text-center font-bold"
+                            />
+                            <span className="text-[10px] text-muted-foreground">p.p.</span>
+                          </div>
+                        </div>
+
+                        {params.selectedProducts.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 mt-4 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemoveProductRow(idx)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Quick Preset Buttons for Burgers Per Person */}
+                <div className="pt-2 border-t flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-muted-foreground">Quick Preset Burgers p.p.:</span>
+                  <div className="flex gap-1.5">
+                    {BURGER_QTY_PRESETS.map((qty) => (
+                      <Button
+                        key={qty}
+                        size="sm"
+                        variant="secondary"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => {
+                          if (params.selectedProducts.length > 0) {
+                            handleProductRowChange(0, "quantityPerPerson", qty);
+                          }
+                        }}
+                      >
+                        {qty} p.p.
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Breakdown: Travel, Setup, Service */}
+              <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                <span className="block text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-gold" /> Urenopbouw (per Vennoot op locatie)
+                </span>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground mb-1">Reistijd (Heen/Terug)</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={params.travelHours}
+                      onChange={(e) => setParams({ ...params, travelHours: parseFloat(e.target.value) || 0 })}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground mb-1">Opbouw + Afbouw</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={params.setupHours}
+                      onChange={(e) => setParams({ ...params, setupHours: parseFloat(e.target.value) || 0 })}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground mb-1">Bakken & Serveren</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={params.serviceHours}
+                      onChange={(e) => setParams({ ...params, serviceHours: parseFloat(e.target.value) || 0 })}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Logistics & Fixed Costs */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <Fuel className="h-3.5 w-3.5 text-gold" /> Kilometers (Totaal)
+                  </label>
+                  <Input
+                    type="number"
+                    value={params.distanceKm}
+                    onChange={(e) => setParams({ ...params, distanceKm: parseFloat(e.target.value) || 0 })}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Km-vergoeding (€/km)</label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    value={params.costPerKm}
+                    onChange={(e) => setParams({ ...params, costPerKm: parseFloat(e.target.value) || 0 })}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <Zap className="h-3.5 w-3.5 text-gold" /> Fixed / Gas & Stroom
+                  </label>
+                  <Input
+                    type="number"
+                    value={params.fixedCosts}
+                    onChange={(e) => setParams({ ...params, fixedCosts: parseFloat(e.target.value) || 0 })}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Target Event Margin Presets */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">
+                  Event Winstmarge Preset (Na Directe Kosten)
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {EVENT_MARGIN_PRESETS.map((margin) => (
+                    <Button
+                      key={margin}
+                      size="sm"
+                      variant={params.targetEventMargin === margin ? "default" : "secondary"}
+                      className={`h-9 text-xs ${params.targetEventMargin === margin ? "bg-gold text-background font-bold" : ""}`}
+                      onClick={() => setParams({ ...params, targetEventMargin: margin })}
+                    >
+                      {margin}% Marge
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: VOF Profit & Price Breakdown */}
+        {result && (
+          <div className="space-y-6">
+            {/* Prominent VOF Hourly Earnings Highlight */}
+            <Card className="border-gold/40 bg-gradient-to-b from-card to-gold/5 shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gold uppercase tracking-wider">VOF Vennoten Resultaat</span>
+                  <Badge tone={result.isFeasibleForVof ? "success" : "warning"}>
+                    {result.isFeasibleForVof ? "Rendabel" : "Let Op"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="rounded-xl border bg-background/80 p-4 text-center">
+                  <span className="block text-xs font-medium text-muted-foreground">Uurverdienste per Vennoot</span>
+                  <span className="text-4xl font-extrabold text-gold tracking-tight mt-1 block">
+                    {formatCurrency(result.hourlyEarningsPerPartner)} / uur
+                  </span>
+                  <span className="text-[11px] text-muted-foreground mt-1 block">
+                    Gebaseerd op {result.totalEventHoursElapsed} uur inzet per vennoot (totaal {result.totalPartnerHoursCombined} man-uren)
+                  </span>
+                </div>
+
+                {/* Feasibility Reason Banner */}
+                <div
+                  className={`flex items-start gap-3 rounded-lg border p-3 text-xs ${
+                    result.isFeasibleForVof
+                      ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
+                      : "bg-amber-950/20 border-amber-500/30 text-amber-300"
+                  }`}
+                >
+                  {result.isFeasibleForVof ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                  )}
+                  <p>{result.feasibilityReason}</p>
+                </div>
+
+                {/* VOF Profit Metrics Grid */}
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="rounded-lg border bg-card/60 p-3">
+                    <span className="block text-[11px] text-muted-foreground">Winst per Vennoot (50/50)</span>
+                    <span className="text-xl font-bold text-foreground">{formatCurrency(result.profitPerPartner)}</span>
+                  </div>
+                  <div className="rounded-lg border bg-card/60 p-3">
+                    <span className="block text-[11px] text-muted-foreground">Totale VOF Event Winst</span>
+                    <span className="text-xl font-bold text-emerald-400">{formatCurrency(result.totalVofProfit)}</span>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-2 text-xs">
+                  <div className="flex justify-between items-center font-bold text-sm">
+                    <span>Advies Offerteprijzen:</span>
+                  </div>
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>Totale Pakketprijs Offerte:</span>
+                    <span className="text-base font-bold text-foreground">{formatCurrency(result.advisedPackagePrice)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>Prijs per Persoon / Gast:</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(result.pricePerPerson)}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons for Customer Quote & Saving Event */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                  <Button
+                    size="sm"
+                    variant={copiedQuote ? "default" : "secondary"}
+                    className="h-9 text-[11px] font-semibold px-2"
+                    onClick={handleCopyCustomerQuote}
+                  >
+                    {copiedQuote ? (
+                      <>
+                        <Check className="mr-1 h-3.5 w-3.5 text-emerald-400" /> Gekopieerd
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="mr-1 h-3.5 w-3.5 text-gold" /> WhatsApp
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-9 text-[11px] font-semibold px-2"
+                    onClick={() => setPdfModalOpen(true)}
+                  >
+                    <Printer className="mr-1 h-3.5 w-3.5 text-gold" /> Offerte PDF
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="h-9 text-[11px] font-semibold bg-gold text-background hover:bg-gold/90 px-2"
+                    onClick={handleOpenSaveModal}
+                  >
+                    <BookmarkPlus className="mr-1 h-3.5 w-3.5" /> Event Opslaan
+                  </Button>
+                </div>
+
+                {/* Direct Costs Breakdown */}
+                <div className="rounded-lg border bg-muted/40 p-3 text-xs space-y-1.5 text-muted-foreground">
+                  <div className="font-semibold text-foreground mb-1">Directe Kostprijs Opbouw:</div>
+                  <div className="flex justify-between">
+                    <span>Ingrediënten ({totalBurgersToBake} burgers voor {result.peopleCount} gasten):</span>
+                    <span>{formatCurrency(result.totalFoodCost)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Kilometers ({params.distanceKm} km @ €{params.costPerKm}):</span>
+                    <span>{formatCurrency(result.totalKmCost)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Vaste Kosten (Gas/Stroom/Afschrijving):</span>
+                    <span>{formatCurrency(params.fixedCosts)}</span>
+                  </div>
+                  <div className="border-t pt-1 flex justify-between font-semibold text-foreground">
+                    <span>Totale Directe Kosten:</span>
+                    <span>{formatCurrency(result.totalDirectCosts)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Supplier Procurement & Order List Section */}
+      <Card className="border-gold/30">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-gold" /> 📋 Inkoop & Bestellijst voor Leveranciers
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Automatisch berekend op basis van {params.peopleCount} gasten en {totalBurgersToBake} te bakken burgers (afgerond naar hele verpakkingen).
+              </p>
+            </div>
+            <Badge tone="success">{orderGroups.length} Leverancier(s)</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            {orderGroups.map((group) => (
+              <div key={group.supplierId} className="rounded-xl border bg-card/80 p-4 space-y-4 shadow-sm flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between border-b pb-2">
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground">{group.supplierName}</h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        {group.contactEmail} • {group.contactPhone}
+                      </p>
+                    </div>
+                    <Badge tone="neutral" className="text-[11px]">
+                      {group.items.length} artikel(en)
+                    </Badge>
+                  </div>
+
+                  {/* Items list */}
+                  <div className="space-y-2 text-xs">
+                    {group.items.map((item) => (
+                      <div key={item.ingredientId} className="flex items-center justify-between rounded-lg border bg-muted/30 p-2.5">
+                        <div>
+                          <span className="font-medium block text-foreground">{item.ingredientName}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Nodig: {item.totalBaseUnitsNeeded.toFixed(0)} {item.baseUnit} (Verpakking: {item.packageContent} {item.baseUnit})
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-gold block">
+                            {item.packagesToOrder}x {item.purchaseUnit}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">{formatCurrency(item.totalEstimatedCost)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t flex items-center justify-between">
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground">Geschatte inkoop:</span>
+                    <span className="font-bold text-sm text-foreground">{formatCurrency(group.totalGroupCost)}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={copiedSupplierId === group.supplierId ? "default" : "secondary"}
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleCopyOrderList(group)}
+                  >
+                    {copiedSupplierId === group.supplierId ? (
+                      <>
+                        <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Gekopieerd!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-1.5 h-3.5 w-3.5 text-gold" /> Bestellijst Kopiëren
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save Event Modal */}
+      {saveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <BookmarkPlus className="h-5 w-5 text-gold" /> Event Opslaan in VOF Planningskalender
+              </h3>
+              <Button size="sm" variant="ghost" onClick={() => setSaveModalOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Naam Klant / Opdrachtgever</label>
+                <Input
+                  placeholder="bijv. Rabobank Eindhoven"
+                  value={saveClientName}
+                  onChange={(e) => setSaveClientName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1">Event Omschrijving</label>
+                <Input
+                  placeholder="bijv. Zomerborrel Catering"
+                  value={saveEventName}
+                  onChange={(e) => setSaveEventName(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1">Datum Event</label>
+                  <Input
+                    type="date"
+                    value={saveEventDate}
+                    onChange={(e) => setSaveEventDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Locatie</label>
+                  <Input
+                    placeholder="Eindhoven"
+                    value={saveLocation}
+                    onChange={(e) => setSaveLocation(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button variant="secondary" onClick={() => setSaveModalOpen(false)}>
+                Annuleren
+              </Button>
+              <Button className="bg-gold text-background font-semibold hover:bg-gold/90" onClick={handleConfirmSaveEvent}>
+                Event Opslaan
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable A4 PDF Offerte Modal */}
+      {result && (
+        <PrintableQuoteModal
+          open={pdfModalOpen}
+          onClose={() => setPdfModalOpen(false)}
+          params={params}
+          result={result}
+          products={products}
+        />
+      )}
+    </div>
+  );
+}
