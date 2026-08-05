@@ -8,7 +8,7 @@ const now = "2026-08-04T12:00:00.000Z";
 // Default seed products
 let initialProducts: Product[] = [
   {
-    id: "prod-smikkel-classic",
+    id: "9972227b-3d0b-42c3-b314-59ad774af159",
     name: "Classic Smikkelburger",
     sku: "SMK-CLASSIC",
     description: "Brioche broodje, 1x runderpatty 100g, 1x cheddar en onze signature Smikkelsaus.",
@@ -27,7 +27,7 @@ let initialProducts: Product[] = [
     deletedAt: null
   },
   {
-    id: "prod-smikkel-double",
+    id: "8872227b-3d0b-42c3-b314-59ad774af159",
     name: "Dubbele Smikkelburger",
     sku: "SMK-DOUBLE",
     description: "Brioche broodje, 2x runderpatty 100g, 2x cheddar en extra Smikkelsaus.",
