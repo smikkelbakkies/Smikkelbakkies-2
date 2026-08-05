@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Printer, X, Edit2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Printer, X, Edit2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -32,6 +32,18 @@ export function PrintableQuoteModal({
   const [quoteNumber, setQuoteNumber] = useState(`OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`);
   const [isEditing, setIsEditing] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    if (open) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const productMap = new Map(products.map((p) => [p.id, p]));
@@ -51,32 +63,43 @@ export function PrintableQuoteModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="relative w-full max-w-4xl rounded-xl border bg-background shadow-2xl space-y-4 no-print p-6 print:hidden">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto"
+    >
+      <div className="relative w-full max-w-4xl rounded-xl border bg-card shadow-2xl space-y-4 no-print p-6 my-auto print:hidden">
         
         {/* Controls Header */}
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-base flex items-center gap-2">
-              📄 Offerte PDF Preview (Smikkelbakkies Template)
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="secondary" onClick={onClose} className="font-semibold text-xs border-gold/40 text-gold hover:bg-gold/10">
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Terug naar Calculator
+            </Button>
+
+            <span className="font-bold text-base flex items-center gap-2">
+              📄 Offerte PDF Preview
             </span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="secondary"
               onClick={() => setIsEditing(!isEditing)}
-              className="h-7 text-xs"
+              className="h-9 text-xs"
             >
-              <Edit2 className="mr-1 h-3.5 w-3.5 text-gold" />
-              {isEditing ? "Sluit Gegevens Bewerken" : "Klantgegevens Bewerken"}
+              <Edit2 className="mr-1.5 h-3.5 w-3.5 text-gold" />
+              {isEditing ? "Sluit Gegevens" : "Klant Bewerken"}
             </Button>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handlePrint} className="bg-gold text-background font-semibold hover:bg-gold/90">
-              <Printer className="mr-1.5 h-4 w-4" /> Offerte PDF Genereren / Afdrukken
+            <Button size="sm" onClick={handlePrint} className="h-9 bg-gold text-background font-bold text-xs hover:bg-gold/90">
+              <Printer className="mr-1.5 h-4 w-4" /> Offerte PDF Afdrukken
             </Button>
-            <Button size="sm" variant="ghost" onClick={onClose}>
-              <X className="h-4 w-4" />
+
+            <Button size="icon" variant="ghost" onClick={onClose} className="h-9 w-9 text-muted-foreground hover:text-foreground" aria-label="Sluiten">
+              <X className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -273,6 +296,17 @@ export function PrintableQuoteModal({
             </div>
           </div>
 
+        </div>
+
+        {/* Modal Footer Controls */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Terug naar Calculator
+          </Button>
+
+          <Button size="sm" onClick={handlePrint} className="bg-gold text-background font-bold text-xs hover:bg-gold/90">
+            <Printer className="mr-1.5 h-4 w-4" /> Offerte PDF Afdrukken
+          </Button>
         </div>
 
       </div>
