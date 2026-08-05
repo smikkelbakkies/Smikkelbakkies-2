@@ -42,6 +42,7 @@ create table if not exists public.ingredients (
   name text not null,
   category_id uuid not null references public.ingredient_categories(id),
   primary_supplier_id uuid references public.suppliers(id),
+  supplier_article_code text,
   base_unit text not null,
   purchase_unit text not null,
   package_content numeric(12, 3) not null check (package_content > 0),

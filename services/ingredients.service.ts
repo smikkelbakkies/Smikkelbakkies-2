@@ -1,4 +1,4 @@
-import { calculateUnitPrice } from "@/lib/utils";
+import { calculateUnitPrice, ensureValidUuid, isValidUuid } from "@/lib/utils";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { categories as mockCategories, ingredients as mockIngredients } from "@/services/mock-data";
 import type { Ingredient, IngredientCategory } from "@/types/core";
@@ -14,7 +14,6 @@ export async function listIngredientCategories(): Promise<IngredientCategory[]> 
     .order("sort_order");
 
   if (error || !data || data.length === 0) {
-    // Seed default categories to Supabase if empty
     if (supabase) {
       await supabase.from("ingredient_categories").upsert(
         mockCategories.map((c) => ({
@@ -46,7 +45,6 @@ export async function listIngredients(): Promise<Ingredient[]> {
     .order("name");
 
   if (error || !data || data.length === 0) {
-    // Seed default ingredients to Supabase if empty
     if (supabase) {
       for (const ing of mockIngredients) {
         await supabase.from("ingredients").upsert({
@@ -54,7 +52,6 @@ export async function listIngredients(): Promise<Ingredient[]> {
           name: ing.name,
           category_id: ing.categoryId,
           primary_supplier_id: ing.primarySupplierId,
-          supplier_article_code: ing.supplierArticleCode || null,
           base_unit: ing.baseUnit,
           purchase_unit: ing.purchaseUnit,
           package_content: ing.packageContent,
@@ -89,30 +86,49 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
   const timestamp = new Date().toISOString();
   const unitPrice = calculateUnitPrice(ingredient.purchasePrice, ingredient.packageContent);
 
-  if (isSupabaseConfigured && supabase) {
-    const payload = {
-      id: ingredient.id,
-      name: ingredient.name,
-      category_id: ingredient.categoryId,
-      primary_supplier_id: ingredient.primarySupplierId,
-      supplier_article_code: ingredient.supplierArticleCode || null,
-      base_unit: ingredient.baseUnit,
-      purchase_unit: ingredient.purchaseUnit,
-      package_content: ingredient.packageContent,
-      purchase_price: ingredient.purchasePrice,
-      is_active: ingredient.isActive,
-      updated_at: timestamp
-    };
+  const sanitizedId = ensureValidUuid(ingredient.id);
+  const sanitizedCategoryId = ensureValidUuid(ingredient.categoryId);
+  const sanitizedSupplierId = ingredient.primarySupplierId && isValidUuid(ingredient.primarySupplierId)
+    ? ingredient.primarySupplierId
+    : null;
 
-    const { error } = await supabase.from("ingredients").upsert(payload);
-    if (error) console.error("Supabase ingredient save error:", error);
-  }
-
-  return {
+  const sanitizedIngredient: Ingredient = {
     ...ingredient,
+    id: sanitizedId,
+    categoryId: sanitizedCategoryId,
+    primarySupplierId: sanitizedSupplierId,
     pricePerBaseUnit: unitPrice,
     updatedAt: timestamp
   };
+
+  if (isSupabaseConfigured && supabase) {
+    const fullPayload: any = {
+      id: sanitizedIngredient.id,
+      name: sanitizedIngredient.name,
+      category_id: sanitizedIngredient.categoryId,
+      primary_supplier_id: sanitizedIngredient.primarySupplierId,
+      supplier_article_code: sanitizedIngredient.supplierArticleCode || null,
+      base_unit: sanitizedIngredient.baseUnit,
+      purchase_unit: sanitizedIngredient.purchaseUnit,
+      package_content: sanitizedIngredient.packageContent,
+      purchase_price: sanitizedIngredient.purchasePrice,
+      is_active: sanitizedIngredient.isActive,
+      updated_at: timestamp
+    };
+
+    let { error } = await supabase.from("ingredients").upsert(fullPayload);
+
+    // Fallback if supplier_article_code column is not yet present on remote DB
+    if (error) {
+      delete fullPayload.supplier_article_code;
+      const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
+      if (fallbackResult.error) {
+        console.error("Supabase ingredient save fallback error:", fallbackResult.error);
+      }
+    }
+  }
+
+  return sanitizedIngredient;
 }
 
 export async function deleteIngredientFromDb(ingredientId: string): Promise<void> {
