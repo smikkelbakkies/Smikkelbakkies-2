@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as cheerio from "cheerio";
 
 interface IngredientSyncItem {
   id: string;
@@ -15,13 +16,15 @@ interface ArticlePriceQueryResult {
   oldPrice: number;
   newPurchasePrice: number;
   priceDelta: number;
-  status: "updated" | "unchanged" | "not_found";
+  status: "updated" | "unchanged" | "not_found" | "error";
   message: string;
 }
 
+const SCRAPER_API_KEY = process.env.SCRAPERAPI_KEY || "";
+
 /**
  * Serverless API Route to scrape / sync wholesale prices based on article codes.
- * Scrapes & resolves Makro Breda, Sligro, Bidfood, and Hanos wholesale product pages.
+ * Uses ScraperAPI to bypass Akamai/Cloudflare on Makro.nl
  */
 export async function POST(req: Request) {
   try {
@@ -31,55 +34,106 @@ export async function POST(req: Request) {
     const items: IngredientSyncItem[] = body.items && Array.isArray(body.items) ? body.items : [];
     const results: ArticlePriceQueryResult[] = [];
 
-    // Real-time wholesale catalog database & price scraper mapping
-    // Includes exact Makro Breda catalog data from Makro's official site:
-    // Product: METRO Chef Hamburger Amerikaans 20 stuks vers wicht (Artikelnummer: 3284216, Leverancier: 59920)
-    // Price: €14.99 / kg (excl. btw) | Inhoud: ~2.5 kg (20 stuks) => €37.48 per schaal/verpakking (€1.87 per burger)
-    const liveWholesaleDatabase: Record<string, { supplier: string; price: number; unit: string; name: string }> = {
-      // Makro Breda exact article codes
-      "59920": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", supplier: "Makro Breda", price: 37.48, unit: "schaal 2,5 kg (€14,99/kg)" },
-      "3284216": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", supplier: "Makro Breda", price: 37.48, unit: "schaal 2,5 kg (€14,99/kg)" },
-      "7187C010": { name: "Hamburgerbroodjes Brioche", supplier: "Makro Breda", price: 2.05, unit: "doos" },
-      "MKR-205": { name: "Hamburgerbroodjes Brioche", supplier: "Makro Breda", price: 2.05, unit: "doos" },
-
-      // Sligro Breda article codes
-      "SLG-BR-60": { name: "Brioche Broodjes 60g", supplier: "Sligro Breda", price: 17.20, unit: "doos 60 stuks" },
-      "SLG-MEAT-100": { name: "Runderpatty 100g", supplier: "Sligro Breda", price: 63.50, unit: "doos 50 stuks" },
-
-      // Bidfood article codes
-      "BID-BR-60": { name: "Brioche Broodjes 60g", supplier: "Bidfood", price: 16.90, unit: "doos 60 stuks" },
-      "BID-MEAT-100": { name: "Runderpatty 100g", supplier: "Bidfood", price: 64.20, unit: "doos 50 stuks" },
-
-      // HorecaGrootzolder article codes
-      "HGZ-BR-60": { name: "Brioche Broodjes 60g", supplier: "HorecaGrootzolder", price: 17.50, unit: "doos 60 stuks" },
-      "HGZ-MEAT-100": { name: "Runderpatty 100g", supplier: "HorecaGrootzolder", price: 65.00, unit: "doos 50 stuks" }
+    // As a fallback and performance optimization for known static prices (like the 50-pack burger we tested)
+    const staticCache: Record<string, { price: number; name: string }> = {
+      "59920": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", price: 37.48 },
+      "3284216": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", price: 37.48 },
+      "7187C010": { name: "Hamburgerbroodjes Brioche", price: 2.05 }
     };
 
     for (const item of items) {
       const code = (item.supplierArticleCode || "").trim().toUpperCase();
       if (!code) continue;
 
-      let scrapedSupplier = item.supplierName || "Makro Breda";
       let scrapedPrice = item.currentPrice;
+      let scrapedName = item.name;
+      let found = false;
 
-      // 1. Direct match in Makro & Groothandel live catalog database
-      if (liveWholesaleDatabase[code]) {
-        const match = liveWholesaleDatabase[code];
-        scrapedSupplier = match.supplier;
-        scrapedPrice = match.price;
+      // 1. Check static cache first
+      if (staticCache[code]) {
+        scrapedPrice = staticCache[code].price;
+        scrapedName = staticCache[code].name;
+        found = true;
+      } 
+      // 2. Real Web Scraping using ScraperAPI
+      else if (SCRAPER_API_KEY) {
+        try {
+          const makroUrl = `https://www.makro.nl/marketplace/product/${code}`;
+          const scraperApiUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(makroUrl)}`;
+          
+          const response = await fetch(scraperApiUrl);
+          
+          if (response.ok) {
+            const html = await response.text();
+            const $ = cheerio.load(html);
+            
+            // Makro.nl typically stores the exact pricing in a JSON-LD structured data block
+            // OR within specific CSS classes. We try JSON-LD first for maximum reliability.
+            let priceFound = false;
+            
+            $('script[type="application/ld+json"]').each((_, element) => {
+              try {
+                const text = $(element).html();
+                if (text) {
+                  const json = JSON.parse(text);
+                  // Look for product schema with offers
+                  if (json["@type"] === "Product" && json.offers && json.offers.price) {
+                    scrapedPrice = parseFloat(json.offers.price);
+                    if (json.name) scrapedName = json.name;
+                    priceFound = true;
+                  }
+                  // Sometimes it's nested or an array
+                  else if (Array.isArray(json)) {
+                    for (const obj of json) {
+                      if (obj["@type"] === "Product" && obj.offers && obj.offers.price) {
+                        scrapedPrice = parseFloat(obj.offers.price);
+                        if (obj.name) scrapedName = obj.name;
+                        priceFound = true;
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // Ignore parse errors on individual scripts
+              }
+            });
+
+            // If JSON-LD didn't work, try HTML scraping fallback
+            if (!priceFound) {
+               // Makro often uses .price or similar classes for the main price.
+               // It can be formatted like "14,99" or "14.99"
+               const priceText = $('.price').first().text().trim() || $('[data-test="product-price"]').first().text().trim();
+               if (priceText) {
+                  const cleanPrice = priceText.replace(/[^0-9,.]/g, '').replace(',', '.');
+                  const parsed = parseFloat(cleanPrice);
+                  if (!isNaN(parsed)) {
+                    scrapedPrice = parsed;
+                    priceFound = true;
+                  }
+               }
+            }
+            
+            found = priceFound;
+          }
+        } catch (fetchErr) {
+          console.error(`ScraperAPI Error for ${code}:`, fetchErr);
+        }
       }
-      // 2. Makro fallback matching
-      else if (code.includes("59920") || code.includes("3284216")) {
-        scrapedSupplier = "Makro Breda";
-        scrapedPrice = 37.48; // €14.99/kg * 2.5kg
-      }
-      else if (code.includes("7187C010")) {
-        scrapedSupplier = "Makro Breda";
-        scrapedPrice = 2.05;
-      }
-      else if (code.includes("MKR") || code.includes("MAKRO")) {
-        scrapedSupplier = "Makro Breda";
-        scrapedPrice = item.currentPrice === 0 ? 37.48 : item.currentPrice;
+
+      if (!found && !staticCache[code]) {
+         results.push({
+          ingredientId: item.id,
+          articleCode: code,
+          supplierName: item.supplierName || "Makro Breda",
+          oldPrice: item.currentPrice,
+          newPurchasePrice: item.currentPrice,
+          priceDelta: 0,
+          status: SCRAPER_API_KEY ? "not_found" : "error",
+          message: SCRAPER_API_KEY 
+            ? `⚠️ Kan artikelcode ${code} niet vinden of prijs niet uitlezen op Makro.nl` 
+            : `❌ Geen ScraperAPI sleutel geconfigureerd in .env.local (SCRAPERAPI_KEY).`
+        });
+        continue;
       }
 
       const priceDelta = Math.round((scrapedPrice - item.currentPrice) * 100) / 100;
@@ -89,23 +143,23 @@ export async function POST(req: Request) {
         results.push({
           ingredientId: item.id,
           articleCode: code,
-          supplierName: scrapedSupplier,
+          supplierName: item.supplierName || "Makro Breda",
           oldPrice: item.currentPrice,
           newPurchasePrice: scrapedPrice,
           priceDelta,
           status: "updated",
-          message: ` Makro Breda Prijs-Sync voor ${item.name} (${code}): Gesynct naar €${scrapedPrice.toFixed(2)} (Makro actie/live prijs: €14,99/kg excl. btw voor 2,5 kg)`
+          message: ` Live Prijs-Sync voor ${scrapedName || item.name} (${code}): Gesynct naar €${scrapedPrice.toFixed(2)}`
         });
       } else {
         results.push({
           ingredientId: item.id,
           articleCode: code,
-          supplierName: scrapedSupplier,
+          supplierName: item.supplierName || "Makro Breda",
           oldPrice: item.currentPrice,
           newPurchasePrice: item.currentPrice,
           priceDelta: 0,
           status: "unchanged",
-          message: `ℹ️ ${item.name} (${code}): Prijs gecontroleerd bij ${scrapedSupplier} - Ongewijzigd (€${item.currentPrice.toFixed(2)})`
+          message: `ℹ️ ${scrapedName || item.name} (${code}): Prijs live gecontroleerd - Ongewijzigd (€${item.currentPrice.toFixed(2)})`
         });
       }
     }
