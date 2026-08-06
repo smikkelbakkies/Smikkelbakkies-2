@@ -606,8 +606,8 @@ export function EventCalculator() {
 
       {/* Save Event & Offerte Modal */}
       {saveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-xl border bg-background p-6 shadow-2xl space-y-4 my-8">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
@@ -623,7 +623,7 @@ export function EventCalculator() {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold mb-1 text-foreground">Klant / Bedrijfsnaam *</label>
                   <Input
@@ -642,7 +642,7 @@ export function EventCalculator() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold mb-1 text-foreground">Straat + Huisnummer</label>
                   <Input
@@ -661,7 +661,7 @@ export function EventCalculator() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold mb-1 text-foreground">Offertenummer</label>
                   <Input
@@ -675,6 +675,7 @@ export function EventCalculator() {
                     label="Datum Event"
                     value={saveEventDate}
                     onChange={(d) => setSaveEventDate(d)}
+                    align="right"
                   />
                 </div>
               </div>

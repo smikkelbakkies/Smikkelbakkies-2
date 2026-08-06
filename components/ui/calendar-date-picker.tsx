@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ interface DatePickerProps {
   label?: string;
   placeholder?: string;
   className?: string;
+  align?: "left" | "right";
 }
 
 const MONTH_NAMES_NL = [
@@ -25,7 +26,8 @@ export function DatePicker({
   onChange,
   label,
   placeholder = "Selecteer datum...",
-  className
+  className,
+  align = "right"
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +60,7 @@ export function DatePicker({
   }, [open]);
 
   const handlePrevMonth = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (viewMonth === 0) {
       setViewMonth(11);
@@ -68,6 +71,7 @@ export function DatePicker({
   };
 
   const handleNextMonth = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (viewMonth === 11) {
       setViewMonth(0);
@@ -111,21 +115,40 @@ export function DatePicker({
             <CalendarIcon className="h-4 w-4 text-gold" />
             {value ? formatDate(value) : placeholder}
           </span>
-          <span className="text-[10px] text-muted-foreground border rounded px-1 py-0.5">📅 Wijzigen</span>
+          <span className="text-[10px] text-gold border border-gold/40 rounded px-1.5 py-0.5 bg-gold/10 font-semibold">📅 Kalender</span>
         </button>
 
         {open && (
-          <div className="absolute left-0 top-11 z-50 w-72 rounded-xl border bg-background/95 p-4 shadow-2xl backdrop-blur-xl border-gold/30 space-y-3">
+          <div
+            className={cn(
+              "absolute top-11 z-50 w-72 rounded-xl border bg-background p-4 shadow-2xl backdrop-blur-xl border-gold/40 space-y-3",
+              align === "right" ? "right-0 left-auto" : "left-0"
+            )}
+          >
             {/* Header: Month & Year controls */}
             <div className="flex items-center justify-between border-b pb-2">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handlePrevMonth}>
-                <ChevronLeft className="h-4 w-4" />
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 px-2 text-[11px] font-bold text-gold hover:bg-gold/20 flex items-center gap-1 border border-gold/30"
+                onClick={handlePrevMonth}
+              >
+                <ChevronLeft className="h-4 w-4" /> Vorige
               </Button>
-              <span className="text-xs font-bold text-foreground">
+
+              <span className="text-xs font-extrabold text-foreground tracking-tight">
                 {MONTH_NAMES_NL[viewMonth]} {viewYear}
               </span>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleNextMonth}>
-                <ChevronRight className="h-4 w-4" />
+
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 px-2 text-[11px] font-bold text-gold hover:bg-gold/20 flex items-center gap-1 border border-gold/30"
+                onClick={handleNextMonth}
+              >
+                Volgende <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
 
@@ -162,7 +185,7 @@ export function DatePicker({
                       isSelected
                         ? "bg-gold text-background font-bold shadow-md"
                         : isToday
-                        ? "border border-gold text-gold font-bold bg-gold/10"
+                        ? "border border-gold text-gold font-bold bg-gold/15"
                         : "hover:bg-accent text-foreground"
                     )}
                   >
@@ -176,7 +199,7 @@ export function DatePicker({
             <div className="flex items-center justify-between border-t pt-2 text-[11px]">
               <button
                 type="button"
-                className="text-gold font-semibold hover:underline"
+                className="text-gold font-bold hover:underline"
                 onClick={() => {
                   onChange(todayStr);
                   setOpen(false);
@@ -186,7 +209,7 @@ export function DatePicker({
               </button>
               <button
                 type="button"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground font-medium"
                 onClick={() => setOpen(false)}
               >
                 Sluiten
