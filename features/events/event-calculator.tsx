@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Trash2, Users, Utensils, Zap, X } from "lucide-react";
+import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, FileText, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Trash2, Users, Utensils, Zap, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -42,6 +42,10 @@ export function EventCalculator() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveEventName, setSaveEventName] = useState("");
   const [saveClientName, setSaveClientName] = useState("");
+  const [saveContactPerson, setSaveContactPerson] = useState("");
+  const [saveClientAddress, setSaveClientAddress] = useState("");
+  const [saveClientCity, setSaveClientCity] = useState("");
+  const [saveQuoteNumber, setSaveQuoteNumber] = useState("");
   const [saveEventDate, setSaveEventDate] = useState("");
   const [saveLocation, setSaveLocation] = useState("");
 
@@ -122,14 +126,19 @@ export function EventCalculator() {
   };
 
   const handleOpenSaveModal = () => {
+    const generatedQuoteNumber = `OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`;
     setSaveEventName(`Catering ${params.peopleCount}p`);
     setSaveClientName("");
+    setSaveContactPerson("");
+    setSaveClientAddress("");
+    setSaveClientCity("");
+    setSaveQuoteNumber(generatedQuoteNumber);
     setSaveEventDate(new Date().toISOString().split("T")[0]);
     setSaveLocation("");
     setSaveModalOpen(true);
   };
 
-  const handleConfirmSaveEvent = async () => {
+  const handleConfirmSaveEvent = async (andOpenPdf = false) => {
     if (!result) return;
     if (!saveClientName.trim()) {
       notify({ title: "Vul een klantnaam in" });
@@ -141,12 +150,21 @@ export function EventCalculator() {
         eventName: saveEventName,
         eventDate: saveEventDate,
         clientName: saveClientName,
-        location: saveLocation,
+        contactPerson: saveContactPerson,
+        clientAddress: saveClientAddress,
+        clientCity: saveClientCity,
+        quoteNumber: saveQuoteNumber,
+        location: saveLocation || saveClientCity,
         params,
         calculation: result
       });
-      notify({ title: "Event opgeslagen in VOF Planningskalender!" });
+
+      notify({ title: "Event & Offerte opgeslagen in Planningskalender!" });
       setSaveModalOpen(false);
+
+      if (andOpenPdf) {
+        setPdfModalOpen(true);
+      }
     } catch {
       notify({ title: "Fout bij opslaan event" });
     }
@@ -585,64 +603,101 @@ export function EventCalculator() {
         </CardContent>
       </Card>
 
-      {/* Save Event Modal */}
+      {/* Save Event & Offerte Modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <BookmarkPlus className="h-5 w-5 text-gold" /> Event Opslaan in VOF Planningskalender
-              </h3>
-              <Button size="sm" variant="ghost" onClick={() => setSaveModalOpen(false)}>
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                  <BookmarkPlus className="h-5 w-5 text-gold" /> Event & Offerte Gegevens Opslaan
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Vul de klant- en offertegegevens in. Hiermee worden het event én de A4 PDF-offerte in één keer gereed gemaakt!
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setSaveModalOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-medium mb-1">Naam Klant / Opdrachtgever</label>
-                <Input
-                  placeholder="bijv. Rabobank Eindhoven"
-                  value={saveClientName}
-                  onChange={(e) => setSaveClientName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium mb-1">Event Omschrijving</label>
-                <Input
-                  placeholder="bijv. Zomerborrel Catering"
-                  value={saveEventName}
-                  onChange={(e) => setSaveEventName(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium mb-1">Datum Event</label>
+                  <label className="block font-semibold mb-1 text-foreground">Klant / Bedrijfsnaam *</label>
+                  <Input
+                    placeholder="bijv. Rabobank Eindhoven"
+                    value={saveClientName}
+                    onChange={(e) => setSaveClientName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-foreground">T.a.v. Contactpersoon</label>
+                  <Input
+                    placeholder="bijv. Dhr. J. Jansen"
+                    value={saveContactPerson}
+                    onChange={(e) => setSaveContactPerson(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-foreground">Straat + Huisnummer</label>
+                  <Input
+                    placeholder="bijv. Markt 12"
+                    value={saveClientAddress}
+                    onChange={(e) => setSaveClientAddress(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-foreground">Postcode + Plaats / Locatie</label>
+                  <Input
+                    placeholder="bijv. 5611 AA Eindhoven"
+                    value={saveClientCity}
+                    onChange={(e) => setSaveClientCity(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-foreground">Offertenummer</label>
+                  <Input
+                    placeholder="OFF-2026-1001"
+                    value={saveQuoteNumber}
+                    onChange={(e) => setSaveQuoteNumber(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-foreground">Datum Event</label>
                   <Input
                     type="date"
                     value={saveEventDate}
                     onChange={(e) => setSaveEventDate(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block font-medium mb-1">Locatie</label>
-                  <Input
-                    placeholder="Eindhoven"
-                    value={saveLocation}
-                    onChange={(e) => setSaveLocation(e.target.value)}
-                  />
-                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-foreground">Event Omschrijving op Kalender</label>
+                <Input
+                  placeholder="bijv. Zomerborrel Catering"
+                  value={saveEventName}
+                  onChange={(e) => setSaveEventName(e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 border-t pt-4">
               <Button variant="secondary" onClick={() => setSaveModalOpen(false)}>
                 Annuleren
               </Button>
-              <Button className="bg-gold text-background font-semibold hover:bg-gold/90" onClick={handleConfirmSaveEvent}>
-                Event Opslaan
+              <Button variant="secondary" className="border border-gold/50 text-gold hover:bg-gold/10 font-semibold" onClick={() => handleConfirmSaveEvent(false)}>
+                <BookmarkPlus className="mr-1.5 h-4 w-4" /> Event Opslaan
+              </Button>
+              <Button className="bg-gold text-background font-bold hover:bg-gold/90" onClick={() => handleConfirmSaveEvent(true)}>
+                <FileText className="mr-1.5 h-4 w-4" /> Opslaan & Offerte Direct Bekijken
               </Button>
             </div>
           </div>
@@ -657,6 +712,12 @@ export function EventCalculator() {
           params={params}
           result={result}
           products={products}
+          defaultClientName={saveClientName}
+          defaultContactPerson={saveContactPerson}
+          defaultClientAddress={saveClientAddress}
+          defaultClientCity={saveClientCity}
+          defaultEventDate={saveEventDate}
+          defaultQuoteNumber={saveQuoteNumber}
         />
       )}
     </div>

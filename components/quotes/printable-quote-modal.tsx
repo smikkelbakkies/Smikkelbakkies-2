@@ -14,6 +14,11 @@ interface PrintableQuoteModalProps {
   result: EventCalculationResult;
   products: ProductWithCost[];
   defaultClientName?: string;
+  defaultContactPerson?: string;
+  defaultClientAddress?: string;
+  defaultClientCity?: string;
+  defaultEventDate?: string;
+  defaultQuoteNumber?: string;
 }
 
 export function PrintableQuoteModal({
@@ -22,15 +27,31 @@ export function PrintableQuoteModal({
   params,
   result,
   products,
-  defaultClientName = ""
+  defaultClientName = "",
+  defaultContactPerson = "",
+  defaultClientAddress = "",
+  defaultClientCity = "",
+  defaultEventDate = "",
+  defaultQuoteNumber = ""
 }: PrintableQuoteModalProps) {
   const [clientName, setClientName] = useState(defaultClientName || "Bedrijfsnaam / Klantnaam");
-  const [contactPerson, setContactPerson] = useState("T.a.v. Afdeling / Contactpersoon");
-  const [clientAddress, setClientAddress] = useState("Straat en huisnummer");
-  const [clientCity, setClientCity] = useState("Postcode en plaats");
-  const [eventDate, setEventDate] = useState(new Date().toISOString().split("T")[0]);
-  const [quoteNumber, setQuoteNumber] = useState(`OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`);
+  const [contactPerson, setContactPerson] = useState(defaultContactPerson || "T.a.v. Afdeling / Contactpersoon");
+  const [clientAddress, setClientAddress] = useState(defaultClientAddress || "Straat en huisnummer");
+  const [clientCity, setClientCity] = useState(defaultClientCity || "Postcode en plaats");
+  const [eventDate, setEventDate] = useState(defaultEventDate || new Date().toISOString().split("T")[0]);
+  const [quoteNumber, setQuoteNumber] = useState(defaultQuoteNumber || `OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`);
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      if (defaultClientName) setClientName(defaultClientName);
+      if (defaultContactPerson) setContactPerson(defaultContactPerson);
+      if (defaultClientAddress) setClientAddress(defaultClientAddress);
+      if (defaultClientCity) setClientCity(defaultClientCity);
+      if (defaultEventDate) setEventDate(defaultEventDate);
+      if (defaultQuoteNumber) setQuoteNumber(defaultQuoteNumber);
+    }
+  }, [open, defaultClientName, defaultContactPerson, defaultClientAddress, defaultClientCity, defaultEventDate, defaultQuoteNumber]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

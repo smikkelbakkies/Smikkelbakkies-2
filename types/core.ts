@@ -188,8 +188,12 @@ export type SavedEvent = {
   eventName: string;
   eventDate: string;
   clientName: string;
+  contactPerson?: string;
   clientEmail: string;
   clientPhone: string;
+  clientAddress?: string;
+  clientCity?: string;
+  quoteNumber?: string;
   location: string;
   status: SavedEventStatus;
   params: EventPackageParams;

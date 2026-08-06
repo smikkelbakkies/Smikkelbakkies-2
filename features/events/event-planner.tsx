@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Calendar, CheckCircle2, Clock, DollarSign, MapPin, Plus, Trash2, Users, Utensils } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, Clock, DollarSign, FileText, MapPin, Plus, Trash2, Users, Utensils } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { SavedEvent, SavedEventStatus } from "@/types/core";
+import type { ProductWithCost, SavedEvent, SavedEventStatus } from "@/types/core";
 import { deleteSavedEvent, listSavedEvents, updateEventStatus } from "@/services/events.service";
+import { listProducts } from "@/services/recipes.service";
+import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
 
 const STATUS_LABELS: Record<SavedEventStatus, { label: string; tone: "neutral" | "warning" | "success" }> = {
   concept: { label: "Concept", tone: "neutral" },
@@ -21,14 +23,17 @@ const STATUS_LABELS: Record<SavedEventStatus, { label: string; tone: "neutral" |
 
 export function EventPlanner() {
   const [events, setEvents] = useState<SavedEvent[]>([]);
+  const [products, setProducts] = useState<ProductWithCost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeQuoteEvent, setActiveQuoteEvent] = useState<SavedEvent | null>(null);
   const { notify } = useToast();
 
   const loadEvents = async () => {
     setLoading(true);
     try {
-      const data = await listSavedEvents();
-      setEvents(data);
+      const [eventData, prodData] = await Promise.all([listSavedEvents(), listProducts()]);
+      setEvents(eventData);
+      setProducts(prodData);
     } catch {
       notify({ title: "Fout bij laden events" });
     } finally {
@@ -151,6 +156,15 @@ export function EventPlanner() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 text-xs font-semibold text-gold hover:bg-gold/10 border border-gold/30"
+                          onClick={() => setActiveQuoteEvent(evt)}
+                        >
+                          <FileText className="mr-1 h-3.5 w-3.5" /> Offerte PDF
+                        </Button>
+
                         <select
                           value={evt.status}
                           onChange={(e) => handleStatusChange(evt.id, e.target.value as SavedEventStatus)}
@@ -176,6 +190,23 @@ export function EventPlanner() {
           })
         )}
       </div>
+
+      {/* Printable A4 PDF Offerte Modal for Saved Events */}
+      {activeQuoteEvent && (
+        <PrintableQuoteModal
+          open={Boolean(activeQuoteEvent)}
+          onClose={() => setActiveQuoteEvent(null)}
+          params={activeQuoteEvent.params}
+          result={activeQuoteEvent.calculation}
+          products={products}
+          defaultClientName={activeQuoteEvent.clientName}
+          defaultContactPerson={activeQuoteEvent.contactPerson}
+          defaultClientAddress={activeQuoteEvent.clientAddress}
+          defaultClientCity={activeQuoteEvent.clientCity || activeQuoteEvent.location}
+          defaultEventDate={activeQuoteEvent.eventDate}
+          defaultQuoteNumber={activeQuoteEvent.quoteNumber}
+        />
+      )}
     </div>
   );
 }

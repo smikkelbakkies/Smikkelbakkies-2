@@ -347,8 +347,12 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
             eventName: e.name || localMatch?.eventName || `Catering ${params.peopleCount}p`,
             eventDate: e.event_date || localMatch?.eventDate || new Date().toISOString().split("T")[0],
             clientName: clientName || "Opdrachtgever",
+            contactPerson: localMatch?.contactPerson || "",
             clientEmail: localMatch?.clientEmail || "",
             clientPhone: localMatch?.clientPhone || "",
+            clientAddress: localMatch?.clientAddress || "",
+            clientCity: localMatch?.clientCity || "",
+            quoteNumber: localMatch?.quoteNumber || "",
             location: location || "",
             status: (e.status as SavedEventStatus) || localMatch?.status || "concept",
             params,
@@ -377,8 +381,12 @@ export async function saveEvent(data: {
   eventName: string;
   eventDate: string;
   clientName: string;
+  contactPerson?: string;
   clientEmail?: string;
   clientPhone?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  quoteNumber?: string;
   location?: string;
   notes?: string;
   params: EventPackageParams;
@@ -389,8 +397,12 @@ export async function saveEvent(data: {
     eventName: data.eventName || `Catering ${data.clientName}`,
     eventDate: data.eventDate || new Date().toISOString().split("T")[0],
     clientName: data.clientName || "Opdrachtgever",
+    contactPerson: data.contactPerson || "",
     clientEmail: data.clientEmail || "",
     clientPhone: data.clientPhone || "",
+    clientAddress: data.clientAddress || "",
+    clientCity: data.clientCity || "",
+    quoteNumber: data.quoteNumber || "",
     location: data.location || "",
     status: "concept",
     params: data.params,
