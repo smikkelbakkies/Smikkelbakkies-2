@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { DatePicker } from "@/components/ui/calendar-date-picker";
 import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
 import { formatCurrency } from "@/lib/utils";
 import type { EventCalculationResult, EventPackageParams, ProductWithCost, SupplierOrderGroup } from "@/types/core";
@@ -670,11 +671,10 @@ export function EventCalculator() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1 text-foreground">Datum Event</label>
-                  <Input
-                    type="date"
+                  <DatePicker
+                    label="Datum Event"
                     value={saveEventDate}
-                    onChange={(e) => setSaveEventDate(e.target.value)}
+                    onChange={(d) => setSaveEventDate(d)}
                   />
                 </div>
               </div>

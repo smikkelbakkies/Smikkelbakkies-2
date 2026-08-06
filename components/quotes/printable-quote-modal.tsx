@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Printer, X, Edit2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/calendar-date-picker";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { EventCalculationResult, EventPackageParams, ProductWithCost } from "@/types/core";
 
@@ -145,8 +146,11 @@ export function PrintableQuoteModal({
               <Input value={clientCity} onChange={(e) => setClientCity(e.target.value)} />
             </div>
             <div>
-              <label className="block font-medium mb-1">Event Datum</label>
-              <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+              <DatePicker
+                label="Event Datum"
+                value={eventDate}
+                onChange={(d) => setEventDate(d)}
+              />
             </div>
             <div>
               <label className="block font-medium mb-1">Offertenummer</label>
