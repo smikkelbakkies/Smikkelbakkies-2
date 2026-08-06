@@ -201,24 +201,22 @@ export async function syncIngredientPricesByArticleCode(currentItems: Ingredient
   const timestamp = new Date().toISOString();
   const syncLogs: string[] = [];
 
-  // Extract all article codes from items and supplierOptions
-  const articleCodes: string[] = [];
-  currentItems.forEach((item) => {
-    if (item.supplierArticleCode) articleCodes.push(item.supplierArticleCode);
-    if (item.supplierOptions) {
-      item.supplierOptions.forEach((opt) => {
-        if (opt.supplierArticleCode) articleCodes.push(opt.supplierArticleCode);
-      });
-    }
-  });
+  // Build sync items payload with current entered prices
+  const itemsPayload = currentItems
+    .filter((i) => i.supplierArticleCode && i.supplierArticleCode.trim().length > 0)
+    .map((i) => ({
+      id: i.id,
+      name: i.name,
+      supplierArticleCode: i.supplierArticleCode!.trim(),
+      currentPrice: i.purchasePrice
+    }));
 
-  // Call serverless API endpoint
   let apiResults: any[] = [];
   try {
     const res = await fetch("/api/sync-prices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ articleCodes })
+      body: JSON.stringify({ items: itemsPayload })
     });
     const json = await res.json();
     if (json.success && json.results) {
@@ -228,10 +226,12 @@ export async function syncIngredientPricesByArticleCode(currentItems: Ingredient
     console.error("Fout bij aanroepen /api/sync-prices:", e);
   }
 
-  const priceMap = new Map<string, number>();
+  const resultMap = new Map<string, { newPrice: number; message: string; status: string }>();
   apiResults.forEach((r) => {
-    if (r.status === "updated") {
-      priceMap.set(r.articleCode, r.newPurchasePrice);
+    if (r.ingredientId) {
+      resultMap.set(r.ingredientId, { newPrice: r.newPurchasePrice, message: r.message, status: r.status });
+    } else if (r.articleCode) {
+      resultMap.set(r.articleCode.toUpperCase(), { newPrice: r.newPurchasePrice, message: r.message, status: r.status });
     }
   });
 
@@ -241,39 +241,22 @@ export async function syncIngredientPricesByArticleCode(currentItems: Ingredient
     let hasChanges = false;
     let newPrice = item.purchasePrice;
 
-    if (item.supplierArticleCode && priceMap.has(item.supplierArticleCode)) {
-      const fetchedPrice = priceMap.get(item.supplierArticleCode)!;
-      if (fetchedPrice !== item.purchasePrice) {
+    const resMatch = (item.id && resultMap.get(item.id)) || (item.supplierArticleCode && resultMap.get(item.supplierArticleCode.toUpperCase()));
+
+    if (resMatch) {
+      syncLogs.push(resMatch.message);
+      if (resMatch.newPrice !== item.purchasePrice) {
         hasChanges = true;
-        const diff = fetchedPrice - item.purchasePrice;
-        syncLogs.push(` ${item.name} (${item.supplierArticleCode}): Prijs ${diff < 0 ? "verlaagd" : "gewijzigd"} van €${item.purchasePrice.toFixed(2)} naar €${fetchedPrice.toFixed(2)} / ${item.purchaseUnit}`);
-        newPrice = fetchedPrice;
-      } else {
-        syncLogs.push(`ℹ️ ${item.name} (${item.supplierArticleCode}): Prijs gecontroleerd bij groothandel - Ongewijzigd (€${item.purchasePrice.toFixed(2)})`);
+        newPrice = resMatch.newPrice;
       }
     } else if (item.supplierArticleCode) {
       syncLogs.push(`ℹ️ ${item.name} (${item.supplierArticleCode}): Prijs gecontroleerd - Up-to-date (€${item.purchasePrice.toFixed(2)})`);
     }
 
-    // Update supplierOptions array if present or build standard comparison options
-    const updatedOptions = (item.supplierOptions || []).map((opt) => {
-      if (opt.supplierArticleCode && priceMap.has(opt.supplierArticleCode)) {
-        const p = priceMap.get(opt.supplierArticleCode)!;
-        return {
-          ...opt,
-          purchasePrice: p,
-          pricePerBaseUnit: calculateUnitPrice(p, opt.packageContent || item.packageContent),
-          lastUpdated: timestamp
-        };
-      }
-      return opt;
-    });
-
     const updated: Ingredient = {
       ...item,
       purchasePrice: newPrice,
       pricePerBaseUnit: calculateUnitPrice(newPrice, item.packageContent),
-      supplierOptions: updatedOptions.length > 0 ? updatedOptions : item.supplierOptions,
       lastPriceUpdate: hasChanges ? timestamp : item.lastPriceUpdate,
       updatedAt: hasChanges ? timestamp : item.updatedAt
     };
