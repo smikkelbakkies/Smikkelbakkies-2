@@ -20,13 +20,13 @@ interface ArticlePriceQueryResult {
   message: string;
 }
 
-const SCRAPER_API_KEY = process.env.SCRAPERAPI_KEY || "";
-
 /**
  * Serverless API Route to scrape / sync wholesale prices based on article codes.
  * Uses ScraperAPI to bypass Akamai/Cloudflare on Makro.nl
  */
 export async function POST(req: Request) {
+  const SCRAPER_API_KEY = process.env.SCRAPERAPI_KEY || "";
+  
   try {
     const body = await req.json().catch(() => ({}));
     const timestamp = new Date().toISOString();
