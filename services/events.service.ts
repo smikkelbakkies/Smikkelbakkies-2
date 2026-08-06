@@ -7,7 +7,7 @@ import { listSuppliers } from "@/services/suppliers.service";
 
 const now = "2026-08-05T10:00:00.000Z";
 
-// Mock store for saved events
+// Seed fallback events
 let savedEvents: SavedEvent[] = [
   {
     id: "event-01",
@@ -20,7 +20,7 @@ let savedEvents: SavedEvent[] = [
     status: "bevestigd",
     params: {
       peopleCount: 80,
-      selectedProducts: [{ productId: "prod-smikkel-classic", quantityPerPerson: 1.5 }],
+      selectedProducts: [{ productId: "9972227b-3d0b-42c3-b314-59ad774af159", quantityPerPerson: 1.5 }],
       travelHours: 1.0,
       setupHours: 1.5,
       serviceHours: 3.0,
@@ -125,57 +125,58 @@ export async function generateEventOrderList(
   const ingredientMap = new Map(ingredients.map((i) => [i.id, i]));
   const supplierMap = new Map(suppliers.map((s) => [s.id, s]));
 
-  const requiredIngredients = new Map<string, number>();
+  const ingredientTotals = new Map<string, number>();
 
-  for (const selection of selectedProducts) {
-    const product = productMap.get(selection.productId);
-    if (!product) continue;
+  for (const item of selectedProducts) {
+    const prod = productMap.get(item.productId);
+    if (!prod) continue;
 
-    const burgerMultiplier = selection.quantityPerPerson * Math.max(peopleCount, 1);
+    const totalBurgersForThisType = peopleCount * item.quantityPerPerson;
 
-    for (const effIng of product.effectiveIngredients) {
-      const current = requiredIngredients.get(effIng.ingredientId) || 0;
-      requiredIngredients.set(effIng.ingredientId, current + effIng.quantity * burgerMultiplier);
+    for (const effIng of prod.effectiveIngredients) {
+      const current = ingredientTotals.get(effIng.ingredientId) || 0;
+      ingredientTotals.set(effIng.ingredientId, current + effIng.quantity * totalBurgersForThisType);
     }
   }
 
-  const groupsBySupplier = new Map<string, SupplierOrderItem[]>();
+  const supplierGroupsMap = new Map<string, SupplierOrderItem[]>();
 
-  for (const [ingredientId, totalBaseUnitsNeeded] of requiredIngredients.entries()) {
+  for (const [ingredientId, neededAmount] of ingredientTotals.entries()) {
     const ing = ingredientMap.get(ingredientId);
     if (!ing) continue;
 
-    const supplierId = ing.primarySupplierId || "unknown-supplier";
-    const packageContent = Math.max(ing.packageContent, 1);
-    const packagesToOrder = Math.ceil(totalBaseUnitsNeeded / packageContent);
-    const totalEstimatedCost = packagesToOrder * ing.purchasePrice;
+    const supplierId = ing.primarySupplierId || "unassigned";
 
-    const item: SupplierOrderItem = {
+    const packagesToOrder = Math.ceil(neededAmount / ing.packageContent);
+    const totalCost = packagesToOrder * ing.purchasePrice;
+
+    const orderItem: SupplierOrderItem = {
       ingredientId: ing.id,
       ingredientName: ing.name,
-      totalBaseUnitsNeeded,
+      supplierArticleCode: ing.supplierArticleCode || undefined,
       baseUnit: ing.baseUnit,
       purchaseUnit: ing.purchaseUnit,
       packageContent: ing.packageContent,
+      neededAmount,
       packagesToOrder,
-      purchasePricePerPackage: ing.purchasePrice,
-      totalEstimatedCost
+      purchasePrice: ing.purchasePrice,
+      totalCost
     };
 
-    const existingGroup = groupsBySupplier.get(supplierId) || [];
-    existingGroup.push(item);
-    groupsBySupplier.set(supplierId, existingGroup);
+    const existingGroup = supplierGroupsMap.get(supplierId) || [];
+    existingGroup.push(orderItem);
+    supplierGroupsMap.set(supplierId, existingGroup);
   }
 
   const result: SupplierOrderGroup[] = [];
 
-  for (const [supplierId, items] of groupsBySupplier.entries()) {
+  for (const [supplierId, items] of supplierGroupsMap.entries()) {
     const supplier = supplierMap.get(supplierId);
-    const totalGroupCost = items.reduce((sum, i) => sum + i.totalEstimatedCost, 0);
+    const totalGroupCost = items.reduce((acc, curr) => acc + curr.totalCost, 0);
 
     result.push({
       supplierId,
-      supplierName: supplier?.name || "Directe Inkoop / Overige",
+      supplierName: supplier?.name || "Overige / Geen Leverancier",
       contactEmail: supplier?.email || "-",
       contactPhone: supplier?.phone || "-",
       items,
@@ -240,6 +241,10 @@ function setLocalStorageEvents(items: SavedEvent[]): void {
 }
 
 export async function listSavedEvents(): Promise<SavedEvent[]> {
+  const localEventsMap = new Map<string, SavedEvent>(
+    getLocalStorageEvents().map((e) => [e.id, e])
+  );
+
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
       .from("events")
@@ -247,47 +252,62 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const parsed: SavedEvent[] = data.map((e) => ({
-        id: e.id,
-        eventName: e.name,
-        eventDate: e.event_date || new Date().toISOString().split("T")[0],
-        clientName: e.location || "Opdrachtgever",
-        clientEmail: "",
-        clientPhone: "",
-        location: e.location || "",
-        status: (e.status as SavedEventStatus) || "concept",
-        params: e.params || {
-          peopleCount: e.people_count || 50,
-          selectedProducts: [],
-          travelHours: Number(e.travel_hours || 0),
-          setupHours: Number(e.setup_hours || 0),
-          serviceHours: Number(e.service_hours || 0),
-          distanceKm: 0,
-          costPerKm: 0.35,
-          fixedCosts: Number(e.fixed_costs || 0),
-          staffCosts: 0,
-          targetEventMargin: Number(e.target_event_margin || 30),
-          partnersCount: 2
-        },
-        calculation: e.calculation || {
-          peopleCount: e.people_count || 50,
-          totalEventHoursElapsed: 5,
-          totalPartnerHoursCombined: 10,
-          totalFoodCost: 200,
-          totalKmCost: 0,
-          totalDirectCosts: 200,
-          advisedPackagePrice: 300,
-          pricePerPerson: 6,
-          totalVofProfit: 100,
-          profitPerPartner: 50,
-          hourlyEarningsPerPartner: 10,
-          isFeasibleForVof: true,
-          feasibilityReason: "Opgehaald uit Supabase"
-        },
-        notes: e.notes || "",
-        createdAt: e.created_at,
-        updatedAt: e.updated_at
-      }));
+      const parsed: SavedEvent[] = await Promise.all(
+        data.map(async (e) => {
+          const localMatch = localEventsMap.get(e.id);
+
+          const params: EventPackageParams = e.params || localMatch?.params || {
+            peopleCount: e.people_count || 50,
+            selectedProducts: [{ productId: "9972227b-3d0b-42c3-b314-59ad774af159", quantityPerPerson: 1.5 }],
+            travelHours: Number(e.travel_hours || 0),
+            setupHours: Number(e.setup_hours || 0),
+            serviceHours: Number(e.service_hours || 0),
+            distanceKm: 0,
+            costPerKm: 0.35,
+            fixedCosts: Number(e.fixed_costs || 0),
+            staffCosts: 0,
+            targetEventMargin: Number(e.target_event_margin || 35),
+            partnersCount: 2
+          };
+
+          // Recalculate calculation live dynamically if missing or inaccurate
+          const calculation: EventCalculationResult = (e.calculation && e.calculation.advisedPackagePrice)
+            ? e.calculation
+            : (localMatch?.calculation && localMatch.calculation.advisedPackagePrice)
+            ? localMatch.calculation
+            : await calculateEventPackage(params);
+
+          let clientName = localMatch?.clientName;
+          let location = localMatch?.location;
+
+          if (!clientName && e.location) {
+            if (e.location.includes(" - ")) {
+              const parts = e.location.split(" - ");
+              clientName = parts[0];
+              location = parts.slice(1).join(" - ");
+            } else {
+              clientName = e.location;
+              location = "";
+            }
+          }
+
+          return {
+            id: e.id,
+            eventName: e.name || localMatch?.eventName || `Catering ${params.peopleCount}p`,
+            eventDate: e.event_date || localMatch?.eventDate || new Date().toISOString().split("T")[0],
+            clientName: clientName || "Opdrachtgever",
+            clientEmail: localMatch?.clientEmail || "",
+            clientPhone: localMatch?.clientPhone || "",
+            location: location || "",
+            status: (e.status as SavedEventStatus) || localMatch?.status || "concept",
+            params,
+            calculation,
+            notes: e.notes || localMatch?.notes || "",
+            createdAt: e.created_at || localMatch?.createdAt || new Date().toISOString(),
+            updatedAt: e.updated_at || localMatch?.updatedAt || new Date().toISOString()
+          };
+        })
+      );
 
       setLocalStorageEvents(parsed);
       return parsed;
@@ -335,11 +355,13 @@ export async function saveEvent(data: {
   setLocalStorageEvents([newEvent, ...localBefore.filter((e) => e.id !== newEvent.id)]);
 
   if (isSupabaseConfigured && supabase) {
+    const formattedLocation = data.location ? `${newEvent.clientName} - ${data.location}` : newEvent.clientName;
+
     const fullPayload: any = {
       id: newEvent.id,
       name: newEvent.eventName,
       event_date: newEvent.eventDate,
-      location: newEvent.clientName,
+      location: formattedLocation,
       people_count: newEvent.params.peopleCount,
       travel_hours: newEvent.params.travelHours,
       service_hours: newEvent.params.serviceHours,
@@ -382,84 +404,27 @@ export async function updateEventStatus(eventId: string, newStatus: SavedEventSt
     };
   }
 
-  const localItems = getLocalStorageEvents();
-  const updatedLocal = localItems.map((e) => e.id === eventId ? { ...e, status: newStatus, updatedAt: new Date().toISOString() } : e);
+  const localBefore = getLocalStorageEvents();
+  const updatedLocal = localBefore.map((e) =>
+    e.id === eventId ? { ...e, status: newStatus, updatedAt: new Date().toISOString() } : e
+  );
   setLocalStorageEvents(updatedLocal);
 
   if (isSupabaseConfigured && supabase) {
-    await supabase
-      .from("events")
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq("id", eventId);
+    await supabase.from("events").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", eventId);
   }
 
-  return savedEvents[index] || updatedLocal.find((e) => e.id === eventId) || savedEvents[0];
+  const all = await listSavedEvents();
+  return all.find((e) => e.id === eventId) || all[0];
 }
 
 export async function deleteSavedEvent(eventId: string): Promise<void> {
   savedEvents = savedEvents.filter((e) => e.id !== eventId);
 
-  const localItems = getLocalStorageEvents();
-  setLocalStorageEvents(localItems.filter((e) => e.id !== eventId));
+  const localBefore = getLocalStorageEvents();
+  setLocalStorageEvents(localBefore.filter((e) => e.id !== eventId));
 
   if (isSupabaseConfigured && supabase) {
     await supabase.from("events").delete().eq("id", eventId);
   }
 }
-
-export async function calculateFestivalEvent(params: import("@/types/core").FestivalEventParams): Promise<import("@/types/core").FestivalEventResult> {
-  const products = await listProducts();
-  const product = products.find((p) => p.id === params.selectedProductId) || products[0];
-
-  const sales = Math.max(params.expectedBurgerSales, 1);
-  const grossTurnover = sales * params.sellingPricePerBurger;
-  const totalFoodCost = sales * (product ? product.costPrice : 3.0);
-  const totalStandFee = params.standFeeFixed + (grossTurnover * (params.standFeePercentage / 100));
-  const totalKmCost = params.distanceKm * params.costPerKm;
-
-  const totalDirectCosts = totalFoodCost + totalStandFee + totalKmCost + params.otherFixedCosts;
-  const totalNetVofProfit = grossTurnover - totalDirectCosts;
-
-  const partnersCount = Math.max(params.partnersCount || 2, 1);
-  const profitPerPartner = totalNetVofProfit / partnersCount;
-
-  const totalEventHoursElapsed = params.travelHours + params.setupHours + params.serviceHours;
-  const totalPartnerHoursCombined = totalEventHoursElapsed * partnersCount;
-
-  const hourlyEarningsPerPartner = totalPartnerHoursCombined > 0 ? totalNetVofProfit / totalPartnerHoursCombined : 0;
-
-  // Net revenue per burger after percentage fee: sellingPrice * (1 - feePct/100) - costPrice
-  const netRevenuePerBurger = params.sellingPricePerBurger * (1 - params.standFeePercentage / 100) - (product ? product.costPrice : 3.0);
-  const fixedBurden = params.standFeeFixed + totalKmCost + params.otherFixedCosts;
-  const breakEvenBurgers = netRevenuePerBurger > 0 ? Math.ceil(fixedBurden / netRevenuePerBurger) : sales;
-
-  const serviceHours = Math.max(params.serviceHours, 0.5);
-  const burgersPerHourPerPartner = sales / (serviceHours * partnersCount);
-
-  let isFeasibleForVof = true;
-  let feasibilityReason = "Goede festivalprognose (> €35/uur per vennoot).";
-
-  if (hourlyEarningsPerPartner < 25) {
-    isFeasibleForVof = false;
-    feasibilityReason = "Risicovol festival (< €25/uur per vennoot). Controleer standgeld en verkoopprijs.";
-  } else if (hourlyEarningsPerPartner < 35) {
-    isFeasibleForVof = true;
-    feasibilityReason = "Voldoende festivalprognose (€25 - €35/uur per vennoot).";
-  }
-
-  return {
-    grossTurnover,
-    totalFoodCost,
-    totalStandFee,
-    totalKmCost,
-    totalDirectCosts,
-    totalNetVofProfit,
-    profitPerPartner,
-    hourlyEarningsPerPartner,
-    breakEvenBurgers,
-    burgersPerHourPerPartner,
-    isFeasibleForVof,
-    feasibilityReason
-  };
-}
-
