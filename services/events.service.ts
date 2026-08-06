@@ -1,4 +1,4 @@
-import type { EventCalculationResult, EventPackageParams, SavedEvent, SavedEventStatus, SupplierOrderGroup, SupplierOrderItem } from "@/types/core";
+import type { EventCalculationResult, EventPackageParams, FestivalEventParams, FestivalEventResult, SavedEvent, SavedEventStatus, SupplierOrderGroup, SupplierOrderItem } from "@/types/core";
 import { formatCurrency } from "@/lib/utils";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { listIngredients } from "@/services/ingredients.service";
@@ -111,6 +111,58 @@ export async function calculateEventPackage(params: EventPackageParams): Promise
   };
 }
 
+export async function calculateFestivalEvent(params: FestivalEventParams): Promise<FestivalEventResult> {
+  const products = await listProducts();
+  const prod = products.find((p) => p.id === params.selectedProductId) || products[0];
+  const burgerCostPrice = prod ? prod.costPrice : 3.0;
+
+  const expectedSales = Math.max(params.expectedBurgerSales, 1);
+  const grossTurnover = expectedSales * params.sellingPricePerBurger;
+  const totalFoodCost = expectedSales * burgerCostPrice;
+
+  const percentageFeeCost = (grossTurnover * params.standFeePercentage) / 100;
+  const totalStandFee = params.standFeeFixed + percentageFeeCost;
+  const totalKmCost = params.distanceKm * params.costPerKm;
+
+  const totalDirectCosts = totalFoodCost + totalStandFee + totalKmCost + params.otherFixedCosts;
+  const totalNetVofProfit = grossTurnover - totalDirectCosts;
+
+  const partnersCount = Math.max(params.partnersCount || 2, 1);
+  const totalEventHoursElapsed = params.travelHours + params.setupHours + params.serviceHours;
+  const totalPartnerHoursCombined = totalEventHoursElapsed * partnersCount;
+
+  const profitPerPartner = totalNetVofProfit / partnersCount;
+  const hourlyEarningsPerPartner = totalPartnerHoursCombined > 0 ? totalNetVofProfit / totalPartnerHoursCombined : 0;
+
+  const netContributionPerBurger = params.sellingPricePerBurger * (1 - params.standFeePercentage / 100) - burgerCostPrice;
+  const totalFixedExpenses = params.standFeeFixed + totalKmCost + params.otherFixedCosts;
+  const breakEvenBurgers = netContributionPerBurger > 0 ? Math.ceil(totalFixedExpenses / netContributionPerBurger) : 0;
+
+  const burgersPerHourPerPartner = (params.serviceHours * partnersCount) > 0 ? expectedSales / (params.serviceHours * partnersCount) : 0;
+
+  let isFeasibleForVof = true;
+  let feasibilityReason = "Uitstekend festival-rendement.";
+  if (hourlyEarningsPerPartner < 25) {
+    isFeasibleForVof = false;
+    feasibilityReason = "Lage uurvergoeding (< €25/uur per vennoot).";
+  }
+
+  return {
+    grossTurnover,
+    totalFoodCost,
+    totalStandFee,
+    totalKmCost,
+    totalDirectCosts,
+    totalNetVofProfit,
+    profitPerPartner,
+    hourlyEarningsPerPartner,
+    breakEvenBurgers,
+    burgersPerHourPerPartner,
+    isFeasibleForVof,
+    feasibilityReason
+  };
+}
+
 export async function generateEventOrderList(
   peopleCount: number,
   selectedProducts: { productId: string; quantityPerPerson: number }[]
@@ -153,14 +205,13 @@ export async function generateEventOrderList(
     const orderItem: SupplierOrderItem = {
       ingredientId: ing.id,
       ingredientName: ing.name,
-      supplierArticleCode: ing.supplierArticleCode || undefined,
+      totalBaseUnitsNeeded: neededAmount,
       baseUnit: ing.baseUnit,
       purchaseUnit: ing.purchaseUnit,
       packageContent: ing.packageContent,
-      neededAmount,
       packagesToOrder,
-      purchasePrice: ing.purchasePrice,
-      totalCost
+      purchasePricePerPackage: ing.purchasePrice,
+      totalEstimatedCost: totalCost
     };
 
     const existingGroup = supplierGroupsMap.get(supplierId) || [];
@@ -172,7 +223,7 @@ export async function generateEventOrderList(
 
   for (const [supplierId, items] of supplierGroupsMap.entries()) {
     const supplier = supplierMap.get(supplierId);
-    const totalGroupCost = items.reduce((acc, curr) => acc + curr.totalCost, 0);
+    const totalGroupCost = items.reduce((acc, curr) => acc + curr.totalEstimatedCost, 0);
 
     result.push({
       supplierId,
