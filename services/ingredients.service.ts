@@ -197,18 +197,22 @@ export function hasDuplicateIngredientName(items: Ingredient[], name: string, ig
   return items.some((item) => item.id !== ignoreId && item.name.trim().toLowerCase() === normalized);
 }
 
-export async function syncIngredientPricesByArticleCode(currentItems: Ingredient[]): Promise<{ updatedItems: Ingredient[]; syncLogs: string[] }> {
+export async function syncIngredientPricesByArticleCode(currentItems: Ingredient[], suppliers: { id: string; name: string }[] = []): Promise<{ updatedItems: Ingredient[]; syncLogs: string[] }> {
   const timestamp = new Date().toISOString();
   const syncLogs: string[] = [];
 
-  // Build sync items payload with current entered prices
+  const supplierMap = new Map<string, string>();
+  suppliers.forEach((s) => supplierMap.set(s.id, s.name));
+
+  // Build sync items payload with current entered prices and supplier name
   const itemsPayload = currentItems
     .filter((i) => i.supplierArticleCode && i.supplierArticleCode.trim().length > 0)
     .map((i) => ({
       id: i.id,
       name: i.name,
       supplierArticleCode: i.supplierArticleCode!.trim(),
-      currentPrice: i.purchasePrice
+      currentPrice: i.purchasePrice,
+      supplierName: i.primarySupplierId ? supplierMap.get(i.primarySupplierId) || "Makro Breda" : "Makro Breda"
     }));
 
   let apiResults: any[] = [];

@@ -70,7 +70,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const handlePriceSync = async () => {
     setSyncing(true);
     try {
-      const { updatedItems, syncLogs: logs } = await syncIngredientPricesByArticleCode(items);
+      const { updatedItems, syncLogs: logs } = await syncIngredientPricesByArticleCode(items, supplierList);
       setItems(updatedItems);
       setSyncLogs(logs);
       setSyncModalOpen(true);
