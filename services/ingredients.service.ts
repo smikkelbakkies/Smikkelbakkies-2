@@ -192,37 +192,86 @@ export async function syncIngredientPricesByArticleCode(currentItems: Ingredient
   const timestamp = new Date().toISOString();
   const syncLogs: string[] = [];
 
+  // Extract all article codes from items and supplierOptions
+  const articleCodes: string[] = [];
+  currentItems.forEach((item) => {
+    if (item.supplierArticleCode) articleCodes.push(item.supplierArticleCode);
+    if (item.supplierOptions) {
+      item.supplierOptions.forEach((opt) => {
+        if (opt.supplierArticleCode) articleCodes.push(opt.supplierArticleCode);
+      });
+    }
+  });
+
+  // Call serverless API endpoint
+  let apiResults: any[] = [];
+  try {
+    const res = await fetch("/api/sync-prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ articleCodes })
+    });
+    const json = await res.json();
+    if (json.success && json.results) {
+      apiResults = json.results;
+    }
+  } catch (e) {
+    console.error("Fout bij aanroepen /api/sync-prices:", e);
+  }
+
+  const priceMap = new Map<string, number>();
+  apiResults.forEach((r) => {
+    if (r.status === "updated") {
+      priceMap.set(r.articleCode, r.newPurchasePrice);
+    }
+  });
+
   const updatedItems: Ingredient[] = [];
 
   for (const item of currentItems) {
-    if (!item.supplierArticleCode) {
-      updatedItems.push(item);
-      continue;
+    let hasChanges = false;
+    let newPrice = item.purchasePrice;
+
+    if (item.supplierArticleCode && priceMap.has(item.supplierArticleCode)) {
+      const fetchedPrice = priceMap.get(item.supplierArticleCode)!;
+      if (fetchedPrice !== item.purchasePrice) {
+        hasChanges = true;
+        const diff = fetchedPrice - item.purchasePrice;
+        syncLogs.push(` ${item.name} (${item.supplierArticleCode}): Prijs ${diff < 0 ? "verlaagd" : "gewijzigd"} van €${item.purchasePrice.toFixed(2)} naar €${fetchedPrice.toFixed(2)} / ${item.purchaseUnit}`);
+        newPrice = fetchedPrice;
+      } else {
+        syncLogs.push(`ℹ️ ${item.name} (${item.supplierArticleCode}): Prijs gecontroleerd bij groothandel - Ongewijzigd (€${item.purchasePrice.toFixed(2)})`);
+      }
+    } else if (item.supplierArticleCode) {
+      syncLogs.push(`ℹ️ ${item.name} (${item.supplierArticleCode}): Prijs gecontroleerd - Up-to-date (€${item.purchasePrice.toFixed(2)})`);
     }
 
-    let priceAdjustment = 0;
-    if (item.supplierArticleCode.includes("BROOD")) {
-      priceAdjustment = -0.50;
-      syncLogs.push(` Brioche broodje (${item.supplierArticleCode}): Prijs verlaagd naar €17,50 (-€0,50 per doos)`);
-    } else if (item.supplierArticleCode.includes("MEAT")) {
-      priceAdjustment = 1.00;
-      syncLogs.push(` Runderpatty 100g (${item.supplierArticleCode}): Prijs gewijzigd naar €65,00 (+€1,00 per doos)`);
-    } else {
-      syncLogs.push(`ℹ️ ${item.name} (${item.supplierArticleCode}): Prijs gecontroleerd - Ongewijzigd`);
-      updatedItems.push(item);
-      continue;
-    }
+    // Update supplierOptions array if present or build standard comparison options
+    const updatedOptions = (item.supplierOptions || []).map((opt) => {
+      if (opt.supplierArticleCode && priceMap.has(opt.supplierArticleCode)) {
+        const p = priceMap.get(opt.supplierArticleCode)!;
+        return {
+          ...opt,
+          purchasePrice: p,
+          pricePerBaseUnit: calculateUnitPrice(p, opt.packageContent || item.packageContent),
+          lastUpdated: timestamp
+        };
+      }
+      return opt;
+    });
 
-    const newPurchasePrice = Math.max(item.purchasePrice + priceAdjustment, 0.01);
-    const updated = {
+    const updated: Ingredient = {
       ...item,
-      purchasePrice: newPurchasePrice,
-      pricePerBaseUnit: calculateUnitPrice(newPurchasePrice, item.packageContent),
-      lastPriceUpdate: timestamp,
-      updatedAt: timestamp
+      purchasePrice: newPrice,
+      pricePerBaseUnit: calculateUnitPrice(newPrice, item.packageContent),
+      supplierOptions: updatedOptions.length > 0 ? updatedOptions : item.supplierOptions,
+      lastPriceUpdate: hasChanges ? timestamp : item.lastPriceUpdate,
+      updatedAt: hasChanges ? timestamp : item.updatedAt
     };
 
-    await saveIngredientToDb(updated);
+    if (hasChanges) {
+      await saveIngredientToDb(updated);
+    }
     updatedItems.push(updated);
   }
 

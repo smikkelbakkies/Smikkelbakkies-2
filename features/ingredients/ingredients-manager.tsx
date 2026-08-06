@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag } from "lucide-react";
+import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
 import { deleteIngredientFromDb, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
 import { listSuppliers } from "@/services/suppliers.service";
-import type { Ingredient, IngredientCategory, Supplier, BaseUnit } from "@/types/core";
+import type { Ingredient, IngredientCategory, Supplier, BaseUnit, SupplierPriceOption } from "@/types/core";
 
 const baseUnits: BaseUnit[] = ["stuk", "gram", "kg", "ml", "liter", "portie"];
 
@@ -27,6 +27,11 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
+
+  // Live Sync & Supplier Comparison Modal
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
+
   const { notify } = useToast();
 
   const loadData = async () => {
@@ -65,17 +70,32 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const handlePriceSync = async () => {
     setSyncing(true);
     try {
-      const { updatedItems, syncLogs } = await syncIngredientPricesByArticleCode(items);
+      const { updatedItems, syncLogs: logs } = await syncIngredientPricesByArticleCode(items);
       setItems(updatedItems);
+      setSyncLogs(logs);
+      setSyncModalOpen(true);
       notify({
         title: "Live Prijs-Sync Voltooid!",
-        description: `Prijzen via artikelcodes gecontroleerd bij groothandel. ${syncLogs.length} artikelen gesynct.`
+        description: `Prijzen via artikelcodes gecontroleerd bij groothandel.`
       });
     } catch {
       notify({ title: "Fout bij prijs-sync" });
     } finally {
       setSyncing(false);
     }
+  };
+
+  const setPrimarySupplier = async (ingredient: Ingredient, supplierId: string, purchasePrice: number) => {
+    const updated: Ingredient = {
+      ...ingredient,
+      primarySupplierId: supplierId,
+      purchasePrice,
+      pricePerBaseUnit: calculateUnitPrice(purchasePrice, ingredient.packageContent),
+      updatedAt: new Date().toISOString()
+    };
+    await saveIngredientToDb(updated);
+    notify({ title: `Primaire leverancier gewijzigd naar ${supplierList.find(s => s.id === supplierId)?.name || "Geselecteerd"}` });
+    await loadData();
   };
 
   const saveIngredient = async (form: IngredientForm) => {
@@ -138,9 +158,9 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={handlePriceSync} disabled={syncing} className="h-9 text-xs font-semibold">
+          <Button variant="secondary" size="sm" onClick={handlePriceSync} disabled={syncing} className="h-9 text-xs font-semibold border border-gold/40 text-gold hover:bg-gold/10">
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 text-gold ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Prijzen controleren..." : "Live Prijs-Sync"}
+            {syncing ? "Prijzen ophalen..." : "Live Prijs-Sync & Vergelijken"}
           </Button>
 
           <Button size="sm" onClick={openCreate} className="h-9 bg-gold text-background font-bold text-xs hover:bg-gold/90">
@@ -159,10 +179,10 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
                   <th className="px-4 py-3">Artikelcode</th>
                   <th className="px-4 py-3">Ingrediënt</th>
                   <th className="px-4 py-3">Categorie</th>
-                  <th className="px-4 py-3">Leverancier</th>
-                  <th className="px-4 py-3">Verpakking / Inkoopprijs</th>
+                  <th className="px-4 py-3">Primaire Leverancier</th>
+                  <th className="px-4 py-3">Inkoopprijs</th>
                   <th className="px-4 py-3">Prijs p/ eenheid</th>
-                  <th className="px-4 py-3">Laatste Update</th>
+                  <th className="px-4 py-3">Leveranciers Vergelijking</th>
                   <th className="px-4 py-3 text-right">Acties</th>
                 </tr>
               </thead>
@@ -187,22 +207,30 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
                       </td>
                       <td className="px-4 py-3 font-semibold text-foreground">{ingredient.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{categories.find((category) => category.id === ingredient.categoryId)?.name ?? "-"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{supplierList.find((supplier) => supplier.id === ingredient.primarySupplierId)?.name ?? "-"}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-gold" />
+                          {supplierList.find((supplier) => supplier.id === ingredient.primarySupplierId)?.name ?? "-"}
+                        </span>
+                      </td>
                       
-                      <td className="px-4 py-3 text-xs">
-                        {ingredient.packageContent} {ingredient.baseUnit} / {ingredient.purchaseUnit} ({formatCurrency(ingredient.purchasePrice)})
+                      <td className="px-4 py-3 text-xs font-medium">
+                        {formatCurrency(ingredient.purchasePrice)} ({ingredient.packageContent} {ingredient.baseUnit} / {ingredient.purchaseUnit})
                       </td>
 
                       <td className="px-4 py-3 font-bold text-foreground">
                         {formatCurrency(ingredient.pricePerBaseUnit)}
-                        {cheapestOpt && !isCheapestPrimary && (
-                          <span className="block text-[10px] text-emerald-400 font-medium">
-                            Bespaar €{(ingredient.pricePerBaseUnit - cheapestOpt.pricePerBaseUnit).toFixed(2)} bij {cheapestOpt.supplierName}
-                          </span>
-                        )}
                       </td>
 
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(ingredient.lastPriceUpdate)}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {cheapestOpt && !isCheapestPrimary ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-400 font-bold">
+                            🌟 Bespaar €{(ingredient.pricePerBaseUnit - cheapestOpt.pricePerBaseUnit).toFixed(2)} bij {cheapestOpt.supplierName}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">Voordeligste leverancier gekozen</span>
+                        )}
+                      </td>
 
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
@@ -223,10 +251,116 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         </CardContent>
       </Card>
 
-      {/* Modal Dialog */}
+      {/* Modal Dialog for Ingredient Form */}
       <Dialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Ingrediënt Bewerken" : "Nieuw Ingrediënt Opslaan"}>
         <IngredientForm ingredient={editing} categories={categories} suppliers={supplierList} error={error} onSubmit={saveIngredient} />
       </Dialog>
+
+      {/* Live Sync & Multi-Supplier Price Comparison Modal */}
+      {syncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-xl border bg-background p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                  <RefreshCw className="h-5 w-5 text-gold" /> Live Prijs-Sync & Leverancier Vergelijking
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Overzicht van gecontroleerde groothandel inkoopprijzen op basis van artikelcodes.
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setSyncModalOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Sync Logs Console */}
+            <div className="rounded-lg border bg-black/40 p-4 space-y-1 font-mono text-[11px] max-h-48 overflow-y-auto">
+              <div className="text-gold font-bold mb-2">📋 Live Sync Status Rapportage:</div>
+              {syncLogs.map((log, idx) => (
+                <div key={idx} className="text-zinc-300">
+                  {log}
+                </div>
+              ))}
+            </div>
+
+            {/* Multi-Supplier Price Matrix Table */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-xs flex items-center gap-2 text-foreground">
+                <Building2 className="h-4 w-4 text-gold" /> Vergelijkbare Producten per Leverancier
+              </h4>
+
+              <div className="overflow-x-auto rounded-lg border border-border/40">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 text-muted-foreground font-semibold border-b">
+                    <tr>
+                      <th className="px-3 py-2">Ingrediënt</th>
+                      <th className="px-3 py-2">Primaire Leverancier</th>
+                      <th className="px-3 py-2">Huidige Inkoopprijs</th>
+                      <th className="px-3 py-2">Voordeligste Groothandel</th>
+                      <th className="px-3 py-2 text-right">Acties</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.filter(i => i.supplierArticleCode).map((ing) => {
+                      const options = ing.supplierOptions || [];
+                      const cheapest = options.length > 0
+                        ? [...options].sort((a, b) => a.pricePerBaseUnit - b.pricePerBaseUnit)[0]
+                        : null;
+
+                      const isCheapestPrimary = cheapest ? cheapest.isPrimary : true;
+
+                      return (
+                        <tr key={ing.id} className="border-t">
+                          <td className="px-3 py-2.5 font-bold text-foreground">
+                            {ing.name}
+                            <span className="block text-[10px] text-gold font-mono">{ing.supplierArticleCode}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-muted-foreground">
+                            {supplierList.find(s => s.id === ing.primarySupplierId)?.name || "Onbekend"}
+                          </td>
+                          <td className="px-3 py-2.5 font-semibold text-foreground">
+                            {formatCurrency(ing.purchasePrice)} / {ing.purchaseUnit}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {cheapest && !isCheapestPrimary ? (
+                              <div className="text-emerald-400 font-bold text-[11px]">
+                                🌟 {cheapest.supplierName}: {formatCurrency(cheapest.purchasePrice)} ({formatCurrency(cheapest.pricePerBaseUnit)}/{ing.baseUnit})
+                              </div>
+                            ) : (
+                              <div className="text-zinc-400 text-[11px]">
+                                ✓ Primaire leverancier is het voordeligst
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            {cheapest && !isCheapestPrimary && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 text-[10px] font-bold text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/20"
+                                onClick={() => setPrimarySupplier(ing, cheapest.supplierId, cheapest.purchasePrice)}
+                              >
+                                Switch naar {cheapest.supplierName}
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t pt-3">
+              <Button className="bg-gold text-background font-bold hover:bg-gold/90 text-xs" onClick={() => setSyncModalOpen(false)}>
+                Sluiten
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

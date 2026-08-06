@@ -25,11 +25,13 @@ export type IngredientCategory = {
 export type SupplierPriceOption = {
   supplierId: string;
   supplierName: string;
+  supplierArticleCode?: string;
   purchaseUnit: string;
   packageContent: number;
   purchasePrice: number;
   pricePerBaseUnit: number;
   isPrimary: boolean;
+  lastUpdated?: string;
 };
 
 export type Ingredient = {
