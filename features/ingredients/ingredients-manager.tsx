@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
 import { deleteIngredientFromDb, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
+import { listSuppliers } from "@/services/suppliers.service";
 import type { Ingredient, IngredientCategory, Supplier, BaseUnit } from "@/types/core";
 
 const baseUnits: BaseUnit[] = ["stuk", "gram", "kg", "ml", "liter", "portie"];
@@ -19,6 +20,7 @@ type IngredientForm = Omit<Ingredient, "pricePerBaseUnit" | "createdAt" | "updat
 
 export function IngredientsManager({ initialIngredients, categories, suppliers }: { initialIngredients: Ingredient[]; categories: IngredientCategory[]; suppliers: Supplier[] }) {
   const [items, setItems] = useState(initialIngredients);
+  const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [editing, setEditing] = useState<Ingredient | null>(null);
@@ -29,12 +31,15 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
 
   const loadData = async () => {
     try {
-      const data = await listIngredients();
-      if (data && data.length > 0) {
-        setItems(data);
+      const [ingData, supData] = await Promise.all([listIngredients(), listSuppliers()]);
+      if (ingData && ingData.length > 0) {
+        setItems(ingData);
+      }
+      if (supData && supData.length > 0) {
+        setSupplierList(supData);
       }
     } catch (e) {
-      console.error("Fout bij laden ingredienten op client:", e);
+      console.error("Fout bij laden ingredienten en leveranciers op client:", e);
     }
   };
 
@@ -51,6 +56,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   }, [items, query, categoryFilter]);
 
   const openCreate = () => {
+    loadData();
     setEditing(null);
     setError("");
     setFormOpen(true);
@@ -110,43 +116,54 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         <div className="flex flex-1 flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek ingrediënt of artikelcode..." />
+            <Input
+              className="pl-9 text-xs"
+              placeholder="Zoek op ingrediënt of groothandel artikelcode..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </div>
-          <div className="relative md:w-64">
-            <Filter className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Select className="pl-9" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">Alle categorieën</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select className="text-xs" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="all">Alle Categorieën</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
             </Select>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={handlePriceSync} disabled={syncing} className="font-medium text-xs">
-            <RefreshCw className={`mr-1.5 h-4 w-4 text-gold ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Prijzen Syncen..." : "Live Prijs-Sync (Artikelcode)"}
+          <Button variant="secondary" size="sm" onClick={handlePriceSync} disabled={syncing} className="h-9 text-xs font-semibold">
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 text-gold ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Prijzen controleren..." : "Live Prijs-Sync"}
           </Button>
 
-          <Button onClick={openCreate} className="bg-gold text-background font-semibold hover:bg-gold/90">
-            <Plus className="h-4 w-4 mr-1" /> Ingrediënt Toevoegen
+          <Button size="sm" onClick={openCreate} className="h-9 bg-gold text-background font-bold text-xs hover:bg-gold/90">
+            <Plus className="mr-1.5 h-4 w-4" /> Ingrediënt Toevoegen
           </Button>
         </div>
       </div>
 
-      <Card>
+      {/* Main Ingredients Table */}
+      <Card className="border-gold/30 bg-card/60 shadow-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Artikelcode</th>
-                  <th className="px-4 py-3 font-medium">Ingrediënt</th>
-                  <th className="px-4 py-3 font-medium">Categorie</th>
-                  <th className="px-4 py-3 font-medium">Primaire Leverancier</th>
-                  <th className="px-4 py-3 font-medium">Verpakking & Prijs</th>
-                  <th className="px-4 py-3 font-medium">Prijs per basis</th>
-                  <th className="px-4 py-3 font-medium">Laatste Sync</th>
-                  <th className="px-4 py-3 text-right font-medium">Acties</th>
+                  <th className="px-4 py-3">Artikelcode</th>
+                  <th className="px-4 py-3">Ingrediënt</th>
+                  <th className="px-4 py-3">Categorie</th>
+                  <th className="px-4 py-3">Leverancier</th>
+                  <th className="px-4 py-3">Verpakking / Inkoopprijs</th>
+                  <th className="px-4 py-3">Prijs p/ eenheid</th>
+                  <th className="px-4 py-3">Laatste Update</th>
+                  <th className="px-4 py-3 text-right">Acties</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +187,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
                       </td>
                       <td className="px-4 py-3 font-semibold text-foreground">{ingredient.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{categories.find((category) => category.id === ingredient.categoryId)?.name ?? "-"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{suppliers.find((supplier) => supplier.id === ingredient.primarySupplierId)?.name ?? "-"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{supplierList.find((supplier) => supplier.id === ingredient.primarySupplierId)?.name ?? "-"}</td>
                       
                       <td className="px-4 py-3 text-xs">
                         {ingredient.packageContent} {ingredient.baseUnit} / {ingredient.purchaseUnit} ({formatCurrency(ingredient.purchasePrice)})
@@ -189,7 +206,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
 
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditing(ingredient); setError(""); setFormOpen(true); }} aria-label="Bewerken">
+                          <Button variant="ghost" size="icon" onClick={() => { loadData(); setEditing(ingredient); setError(""); setFormOpen(true); }} aria-label="Bewerken">
                             <Edit3 className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => removeIngredient(ingredient)} aria-label="Verwijderen">
@@ -206,16 +223,20 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         </CardContent>
       </Card>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Ingrediënt bewerken" : "Nieuw ingrediënt"} description="Prijs per basiseenheid wordt automatisch berekend.">
-        <IngredientForm
-          ingredient={editing}
-          categories={categories}
-          suppliers={suppliers}
-          error={error}
-          onSubmit={saveIngredient}
-        />
+      {/* Modal Dialog */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Ingrediënt Bewerken" : "Nieuw Ingrediënt Opslaan"}>
+        <IngredientForm ingredient={editing} categories={categories} suppliers={supplierList} error={error} onSubmit={saveIngredient} />
       </Dialog>
     </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="space-y-1 text-xs">
+      <span className="font-semibold text-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -271,14 +292,5 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
         <Button type="submit"><Plus className="h-4 w-4" />Opslaan</Button>
       </div>
     </form>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-muted-foreground">
-      {label}
-      {children}
-    </label>
   );
 }
