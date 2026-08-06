@@ -53,6 +53,10 @@ export async function listIngredientCategories(): Promise<IngredientCategory[]> 
 }
 
 export async function listIngredients(): Promise<Ingredient[]> {
+  const localItems = getLocalStorageIngredients();
+  const localItemsMap = new Map<string, Ingredient>();
+  localItems.forEach((i) => localItemsMap.set(i.id, i));
+
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
       .from("ingredients")
@@ -61,30 +65,34 @@ export async function listIngredients(): Promise<Ingredient[]> {
       .order("name");
 
     if (!error && data) {
-      const parsed: Ingredient[] = data.map((item) => ({
-        id: item.id,
-        name: item.name,
-        categoryId: item.category_id,
-        primarySupplierId: item.primary_supplier_id,
-        supplierArticleCode: item.supplier_article_code || undefined,
-        baseUnit: item.base_unit,
-        purchaseUnit: item.purchase_unit,
-        packageContent: Number(item.package_content),
-        purchasePrice: Number(item.purchase_price),
-        pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
-        lastPriceUpdate: item.last_price_update || item.created_at,
-        isActive: item.is_active,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-        deletedAt: item.deleted_at
-      }));
+      const parsed: Ingredient[] = data.map((item) => {
+        const local = localItemsMap.get(item.id);
+        const articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
+
+        return {
+          id: item.id,
+          name: item.name,
+          categoryId: item.category_id,
+          primarySupplierId: item.primary_supplier_id,
+          supplierArticleCode: articleCode,
+          baseUnit: item.base_unit,
+          purchaseUnit: item.purchase_unit,
+          packageContent: Number(item.package_content),
+          purchasePrice: Number(item.purchase_price),
+          pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
+          lastPriceUpdate: item.last_price_update || item.created_at,
+          isActive: item.is_active,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          deletedAt: item.deleted_at
+        };
+      });
 
       setLocalStorageIngredients(parsed);
       return parsed;
     }
   }
 
-  const localItems = getLocalStorageIngredients();
   if (localItems.length > 0) {
     return localItems.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -107,11 +115,12 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     id: sanitizedId,
     categoryId: sanitizedCategoryId,
     primarySupplierId: sanitizedSupplierId,
+    supplierArticleCode: ingredient.supplierArticleCode?.trim() || undefined,
     pricePerBaseUnit: unitPrice,
     updatedAt: timestamp
   };
 
-  // LocalStorage persistence
+  // LocalStorage persistence (always retain supplierArticleCode)
   const currentLocal = getLocalStorageIngredients();
   const index = currentLocal.findIndex((i) => i.id === sanitizedIngredient.id);
   let updatedLocal: Ingredient[];
