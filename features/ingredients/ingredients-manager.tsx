@@ -388,8 +388,15 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     purchasePrice: ingredient?.purchasePrice ?? 0,
     isActive: ingredient?.isActive ?? true
   }));
-
   const unitPrice = calculateUnitPrice(form.purchasePrice, form.packageContent);
+
+  let portionPriceInfo = "";
+  if (form.portionWeight && form.baseUnit !== "stuk" && form.baseUnit !== "portie") {
+    let multiplier = form.portionWeight;
+    if (form.baseUnit === "kg" || form.baseUnit === "liter") multiplier = form.portionWeight / 1000;
+    const pPrice = unitPrice * multiplier;
+    portionPriceInfo = `(€ ${pPrice.toFixed(2)} / portie)`;
+  }
 
   return (
     <form
@@ -418,15 +425,15 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
             {baseUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
           </Select>
         </Field>
-        {form.baseUnit === "portie" && (
-          <Field label="Gewicht per portie (gram/ml)">
+        {form.baseUnit !== "stuk" && (
+          <Field label={form.baseUnit === "portie" ? "Gewicht per portie (gram/ml)" : "Optioneel: Portiegrootte (gram/ml)"}>
             <Input type="number" min="0" step="0.1" placeholder="bijv. 50" value={form.portionWeight || ""} onChange={(event) => setForm({ ...form, portionWeight: event.target.value ? Number(event.target.value) : undefined })} />
           </Field>
         )}
         <Field label="Inkoopeenheid"><Input value={form.purchaseUnit} onChange={(event) => setForm({ ...form, purchaseUnit: event.target.value })} /></Field>
         <Field label="Inhoud verpakking"><Input type="number" min="0.001" step="0.001" value={form.packageContent} onChange={(event) => setForm({ ...form, packageContent: Number(event.target.value) })} /></Field>
         <Field label="Inkoopprijs (€)"><Input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => setForm({ ...form, purchasePrice: Number(event.target.value) })} /></Field>
-        <Field label="Prijs per basiseenheid"><Input readOnly value={formatCurrency(unitPrice)} /></Field>
+        <Field label="Prijs per basiseenheid"><Input readOnly value={`${formatCurrency(unitPrice)} ${portionPriceInfo}`.trim()} /></Field>
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit"><Plus className="h-4 w-4" />Opslaan</Button>
