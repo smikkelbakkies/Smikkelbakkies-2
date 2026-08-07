@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, FileText, Filter, MapPin, Plus, Trash2, Users, Utensils, Sparkles } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, FileText, Filter, MapPin, Plus, ShoppingCart, Trash2, Users, Utensils, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { deleteSavedEvent, listSavedEvents, updateEventStatus } from "@/services
 import { listProducts } from "@/services/recipes.service";
 import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
 import { EditEventModal } from "./edit-event-modal";
+import { EventOrderListModal } from "@/components/quotes/event-order-list-modal";
 
 const STATUS_CONFIG: Record<SavedEventStatus, { label: string; tone: "neutral" | "warning" | "success"; colorClass: string }> = {
   concept: { label: "Concept", tone: "neutral", colorClass: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
@@ -38,6 +39,10 @@ export function EventPlanner() {
   // Edit Event State
   const [editingEvent, setEditingEvent] = useState<SavedEvent | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Order List State
+  const [orderListEvent, setOrderListEvent] = useState<SavedEvent | null>(null);
+  const [orderListModalOpen, setOrderListModalOpen] = useState(false);
 
   // Filters & Views
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
@@ -466,6 +471,18 @@ export function EventPlanner() {
                           size="sm"
                           variant="secondary"
                           className="h-8 text-xs font-semibold text-gold hover:bg-gold/10 border border-gold/30"
+                          onClick={() => {
+                            setOrderListEvent(evt);
+                            setOrderListModalOpen(true);
+                          }}
+                        >
+                          <ShoppingCart className="mr-1 h-3.5 w-3.5" /> Bestellijst
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 text-xs font-semibold text-gold hover:bg-gold/10 border border-gold/30"
                           onClick={() => setActiveQuoteEvent(evt)}
                         >
                           <FileText className="mr-1 h-3.5 w-3.5" /> Offerte PDF
@@ -525,6 +542,18 @@ export function EventPlanner() {
             setEditingEvent(null);
           }}
           onEventUpdated={loadEvents}
+        />
+      )}
+
+      {/* Supplier Order List Modal */}
+      {orderListEvent && (
+        <EventOrderListModal
+          event={orderListEvent}
+          open={orderListModalOpen}
+          onClose={() => {
+            setOrderListModalOpen(false);
+            setOrderListEvent(null);
+          }}
         />
       )}
     </div>
