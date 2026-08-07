@@ -85,7 +85,121 @@ export function PrintableQuoteModal({
   const totalInclVat = subtotalExclVat + vatAmount;
 
   const handlePrint = () => {
-    window.print();
+    const sheetEl = document.querySelector(".printable-quote-sheet");
+    if (!sheetEl) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=850,height=1100");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="nl">
+        <head>
+          <meta charset="utf-8">
+          <title>Offerte ${quoteNumber} - Smikkelbakkies VOF</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm 15mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              background: #ffffff !important;
+              color: #000000 !important;
+              margin: 0;
+              padding: 0;
+              font-size: 12px;
+              line-height: 1.4;
+            }
+            .printable-quote-sheet {
+              width: 100%;
+              background: #ffffff !important;
+              color: #000000 !important;
+            }
+            .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+            .text-base { font-size: 1rem; line-height: 1.5rem; }
+            .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+            .text-xs { font-size: 0.75rem; line-height: 1rem; }
+            .text-\\[11px\\] { font-size: 11px; }
+            .text-\\[10px\\] { font-size: 10px; }
+            .font-bold { font-weight: 700; }
+            .font-medium { font-weight: 500; }
+            .font-semibold { font-weight: 600; }
+            .font-extrabold { font-weight: 800; }
+            .uppercase { text-transform: uppercase; }
+            .tracking-tight { letter-spacing: -0.025em; }
+            .tracking-wider { letter-spacing: 0.05em; }
+            .text-black { color: #000000; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-600 { color: #4b5563; }
+            .flex { display: flex; }
+            .justify-between { justify-content: space-between; }
+            .items-start { align-items: flex-start; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .grid-cols-\\[110px_1fr\\] { grid-template-columns: 110px 1fr; }
+            .gap-8 { gap: 2rem; }
+            .gap-12 { gap: 3rem; }
+            .gap-1 { gap: 0.25rem; }
+            .space-y-1 > * + * { margin-top: 0.25rem; }
+            .space-y-1\\.5 > * + * { margin-top: 0.375rem; }
+            .space-y-2 > * + * { margin-top: 0.5rem; }
+            .space-y-4 > * + * { margin-top: 1rem; }
+            .space-y-6 > * + * { margin-top: 1.5rem; }
+            .pt-2 { padding-top: 0.5rem; }
+            .pt-4 { padding-top: 1rem; }
+            .pt-6 { padding-top: 1.5rem; }
+            .pt-8 { padding-top: 2rem; }
+            .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+            .py-1\\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+            .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .py-2\\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+            .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+            .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+            .pr-2 { padding-right: 0.5rem; }
+            .pl-2 { padding-left: 0.5rem; }
+            .pl-4 { padding-left: 1rem; }
+            .w-full { width: 100%; }
+            .w-72 { width: 18rem; }
+            .border-b { border-bottom: 1px solid #e5e7eb; }
+            .border-b-2 { border-bottom: 2px solid #000000; }
+            .border-t { border-top: 1px solid #e5e7eb; }
+            .border-black { border-color: #000000; }
+            .border-collapse { border-collapse: collapse; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .block { display: block; }
+            .bg-gray-50\\/50 { background-color: rgba(249, 250, 251, 0.6); }
+            .divide-y > * + * { border-top: 1px solid #e5e7eb; }
+            .divide-gray-300 > * + * { border-color: #d1d5db; }
+            .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+            .leading-relaxed { line-height: 1.6; }
+            table { width: 100%; border-collapse: collapse; }
+          </style>
+        </head>
+        <body>
+          ${sheetEl.outerHTML}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 300);
   };
 
   return (
