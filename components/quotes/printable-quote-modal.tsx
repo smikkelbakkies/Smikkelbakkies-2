@@ -95,10 +95,10 @@ export function PrintableQuoteModal({
       }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto"
     >
-      <div className="relative w-full max-w-4xl rounded-xl border bg-card shadow-2xl space-y-4 no-print p-6 my-auto print:hidden">
+      <div className="relative w-full max-w-4xl rounded-xl border bg-card shadow-2xl space-y-4 p-6 my-auto print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none print:w-full print:bg-white print:space-y-0">
         
         {/* Controls Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 no-print print:hidden">
           <div className="flex items-center gap-3">
             <Button size="sm" variant="secondary" onClick={onClose} className="font-semibold text-xs border-gold/40 text-gold hover:bg-gold/10">
               <ArrowLeft className="mr-1.5 h-4 w-4" /> Terug naar Calculator
@@ -132,7 +132,7 @@ export function PrintableQuoteModal({
 
         {/* Editable fields drawer */}
         {isEditing && (
-          <div className="rounded-lg border bg-muted/40 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="rounded-lg border bg-muted/40 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs no-print print:hidden">
             <div>
               <label className="block font-medium mb-1">Klant / Bedrijfsnaam</label>
               <Input value={clientName} onChange={(e) => setClientName(e.target.value)} />
@@ -321,7 +321,7 @@ export function PrintableQuoteModal({
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between pt-2 border-t no-print print:hidden">
           <Button variant="ghost" size="sm" onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Terug naar Calculator
           </Button>

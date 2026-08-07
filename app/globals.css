@@ -72,9 +72,16 @@ textarea {
 }
 
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html, body {
     background: white !important;
     color: black !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   body * {
@@ -92,14 +99,15 @@ textarea {
     top: 0 !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 20mm 15mm !important;
+    padding: 0 !important;
     background: white !important;
     color: black !important;
     box-shadow: none !important;
     border: none !important;
   }
 
-  .no-print {
+  .no-print,
+  .print\:hidden {
     display: none !important;
   }
 }
