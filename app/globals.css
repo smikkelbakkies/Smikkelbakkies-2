@@ -74,18 +74,21 @@ textarea {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
   }
 
   html, body {
     background: white !important;
     color: black !important;
-    height: auto !important;
-    overflow: visible !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
 
   .printable-quote-sheet,
@@ -94,16 +97,22 @@ textarea {
   }
 
   .printable-quote-sheet {
-    position: absolute !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
+    right: 0 !important;
     width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 12mm 15mm !important;
     background: white !important;
     color: black !important;
     box-shadow: none !important;
     border: none !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    z-index: 999999 !important;
   }
 
   .no-print,
