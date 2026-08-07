@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, FileText, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Trash2, Users, Utensils, Zap, X } from "lucide-react";
+import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, DollarSign, FileText, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Sparkles, Trash2, Users, Utensils, Zap, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -50,6 +50,7 @@ export function EventCalculator() {
   const [saveEventDate, setSaveEventDate] = useState("");
   const [saveEventTime, setSaveEventTime] = useState("");
   const [saveLocation, setSaveLocation] = useState("");
+  const [targetHourlyRateInput, setTargetHourlyRateInput] = useState<string>("");
 
   const { notify } = useToast();
 
@@ -172,6 +173,22 @@ export function EventCalculator() {
     } catch {
       notify({ title: "Fout bij opslaan event" });
     }
+  };
+
+  const handleTargetHourlyRateChange = (rateVal: number) => {
+    if (!rateVal || rateVal <= 0 || !result) return;
+    const totalPartnerHours = (params.travelHours + params.setupHours + params.serviceHours) * (params.partnersCount || 2);
+    if (totalPartnerHours <= 0) return;
+
+    const neededProfit = rateVal * totalPartnerHours;
+    const requiredPrice = result.totalDirectCosts + neededProfit;
+    if (requiredPrice <= 0) return;
+
+    const marginPercent = (neededProfit / requiredPrice) * 100;
+    setParams({
+      ...params,
+      targetEventMargin: Math.round(marginPercent * 10) / 10
+    });
   };
 
   return (
@@ -394,34 +411,97 @@ export function EventCalculator() {
                 </div>
               </div>
 
-              {/* Target Event Margin Presets */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-2">
-                  Event Winstmarge Preset (Na Directe Kosten)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {EVENT_MARGIN_PRESETS.map((margin) => (
-                    <Button
-                      key={margin}
-                      size="sm"
-                      variant={params.targetEventMargin === margin ? "default" : "secondary"}
-                      className={`h-9 text-xs ${params.targetEventMargin === margin ? "bg-gold text-background font-bold" : ""}`}
-                      onClick={() => setParams({ ...params, targetEventMargin: margin })}
-                    >
-                      {margin}%
-                    </Button>
-                  ))}
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      className="h-9 text-xs w-16 px-2 border-gold/30 focus-visible:ring-gold"
-                      value={params.targetEventMargin === 0 ? "" : params.targetEventMargin}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/^0+(?=\d)/, '');
-                        setParams({ ...params, targetEventMargin: parseFloat(val) || 0 });
-                      }}
-                    />
-                    <span className="text-[10px] text-muted-foreground">%</span>
+              {/* Target Event Margin & Hourly Rate Calculation Block */}
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <label className="block text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4 text-gold" /> Prijsbepaling & Rendement
+                  </label>
+                  <span className="text-[10px] text-gold font-medium">
+                    Bereken via Gewenst Uurloon (€/uur) óf Marge (%)
+                  </span>
+                </div>
+
+                {/* Option 1: Reverse Calculation by Desired Hourly Wage */}
+                <div className="rounded-lg border border-gold/40 bg-gold/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gold flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5" /> Optie 1: Gewenst Uurloon (€/uur per vennoot)
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">Omgekeerd berekenen</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                    {[30, 40, 50, 60, 75].map((rate) => {
+                      const isActive = result && Math.abs(result.hourlyEarningsPerPartner - rate) < 1.2;
+                      return (
+                        <Button
+                          key={rate}
+                          type="button"
+                          size="sm"
+                          variant={isActive ? "default" : "secondary"}
+                          className={`h-8 text-xs ${isActive ? "bg-gold text-background font-bold" : ""}`}
+                          onClick={() => {
+                            setTargetHourlyRateInput(rate.toString());
+                            handleTargetHourlyRateChange(rate);
+                          }}
+                        >
+                          € {rate}/uur
+                        </Button>
+                      );
+                    })}
+
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        placeholder="Vrij €/u"
+                        className="h-8 text-xs w-20 px-2 border-gold/40 focus-visible:ring-gold"
+                        value={targetHourlyRateInput}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/^0+(?=\d)/, '');
+                          setTargetHourlyRateInput(val);
+                          handleTargetHourlyRateChange(parseFloat(val) || 0);
+                        }}
+                      />
+                      <span className="text-[10px] font-bold text-gold">€/u</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Option 2: Target Event Margin Presets */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-medium text-muted-foreground">
+                    Optie 2: Winstmarge Preset (% op pakketprijs)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {EVENT_MARGIN_PRESETS.map((margin) => (
+                      <Button
+                        key={margin}
+                        type="button"
+                        size="sm"
+                        variant={params.targetEventMargin === margin ? "default" : "secondary"}
+                        className={`h-8 text-xs ${params.targetEventMargin === margin ? "bg-gold text-background font-bold" : ""}`}
+                        onClick={() => {
+                          setTargetHourlyRateInput("");
+                          setParams({ ...params, targetEventMargin: margin });
+                        }}
+                      >
+                        {margin}% Marge
+                      </Button>
+                    ))}
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        className="h-8 text-xs w-16 px-2 border-gold/30 focus-visible:ring-gold"
+                        value={params.targetEventMargin === 0 ? "" : params.targetEventMargin}
+                        onChange={(e) => {
+                          setTargetHourlyRateInput("");
+                          const val = e.target.value.replace(/^0+(?=\d)/, '');
+                          setParams({ ...params, targetEventMargin: parseFloat(val) || 0 });
+                        }}
+                      />
+                      <span className="text-[10px] text-muted-foreground">%</span>
+                    </div>
                   </div>
                 </div>
               </div>

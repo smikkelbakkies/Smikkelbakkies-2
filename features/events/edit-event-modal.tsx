@@ -36,6 +36,7 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
 
   const [params, setParams] = useState<EventPackageParams | null>(null);
   const [calculation, setCalculation] = useState<EventCalculationResult | null>(null);
+  const [targetHourlyRateInput, setTargetHourlyRateInput] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -68,6 +69,22 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
     } catch (err) {
       console.error("Recalculation error:", err);
     }
+  };
+
+  const handleTargetHourlyRateChange = async (rateVal: number) => {
+    if (!rateVal || rateVal <= 0 || !params || !calculation) return;
+    const totalPartnerHours = (params.travelHours + params.setupHours + params.serviceHours) * (params.partnersCount || 2);
+    if (totalPartnerHours <= 0) return;
+
+    const neededProfit = rateVal * totalPartnerHours;
+    const requiredPrice = calculation.totalDirectCosts + neededProfit;
+    if (requiredPrice <= 0) return;
+
+    const marginPercent = (neededProfit / requiredPrice) * 100;
+    await handleParamChange({
+      ...params,
+      targetEventMargin: Math.round(marginPercent * 10) / 10
+    });
   };
 
   const handleSave = async () => {
@@ -228,7 +245,7 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
               <Zap className="h-4 w-4" /> Parameters & Totaalprijs Herberekenen
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               <div>
                 <label className="block font-semibold mb-1">Aantal Gasten</label>
                 <Input
@@ -254,11 +271,28 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
                 />
               </div>
               <div>
+                <label className="block font-semibold mb-1 text-gold">Gewenst Uurloon (€/u)</label>
+                <Input
+                  type="number"
+                  placeholder="bijv. 50"
+                  className="border-gold/40 text-gold font-bold focus-visible:ring-gold"
+                  value={targetHourlyRateInput}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/^0+(?=\d)/, '');
+                    setTargetHourlyRateInput(val);
+                    handleTargetHourlyRateChange(parseFloat(val) || 0);
+                  }}
+                />
+              </div>
+              <div>
                 <label className="block font-semibold mb-1">Winstmarge (%)</label>
                 <Input
                   type="number"
                   value={params.targetEventMargin}
-                  onChange={(e) => handleParamChange({ ...params, targetEventMargin: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    setTargetHourlyRateInput("");
+                    handleParamChange({ ...params, targetEventMargin: parseFloat(e.target.value) || 0 });
+                  }}
                 />
               </div>
             </div>
