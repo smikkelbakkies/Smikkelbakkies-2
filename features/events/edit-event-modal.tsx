@@ -112,9 +112,9 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto"
     >
-      <div className="relative w-full max-w-3xl rounded-xl border bg-card shadow-2xl space-y-4 p-6 my-auto max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-3xl rounded-xl border bg-card shadow-2xl space-y-4 p-4 sm:p-6 my-auto max-h-[92vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b pb-3">

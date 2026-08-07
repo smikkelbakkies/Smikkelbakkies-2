@@ -283,7 +283,7 @@ export function PrintableQuoteModal({
 
         {/* Live A4 Print Sheet Container */}
         <div className="overflow-x-auto rounded-lg">
-          <div className="printable-quote-sheet min-w-[650px] bg-white text-black font-sans text-xs p-6 sm:p-8 rounded-lg shadow-md border print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:min-w-0 space-y-6">
+          <div className="printable-quote-sheet w-full min-w-0 sm:min-w-[650px] bg-white text-black font-sans text-xs p-4 sm:p-8 rounded-lg shadow-md border print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:min-w-0 space-y-6">
           
           {/* Header Row */}
           <div className="flex justify-between items-start">
