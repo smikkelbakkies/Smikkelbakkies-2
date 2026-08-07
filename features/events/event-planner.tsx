@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, FileText, Filter, MapPin, Plus, Trash2, Users, Utensils, Sparkles } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, FileText, Filter, MapPin, Plus, Trash2, Users, Utensils, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import type { ProductWithCost, SavedEvent, SavedEventStatus } from "@/types/core
 import { deleteSavedEvent, listSavedEvents, updateEventStatus } from "@/services/events.service";
 import { listProducts } from "@/services/recipes.service";
 import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
+import { EditEventModal } from "./edit-event-modal";
 
 const STATUS_CONFIG: Record<SavedEventStatus, { label: string; tone: "neutral" | "warning" | "success"; colorClass: string }> = {
   concept: { label: "Concept", tone: "neutral", colorClass: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
@@ -33,6 +34,10 @@ export function EventPlanner() {
   const [products, setProducts] = useState<ProductWithCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeQuoteEvent, setActiveQuoteEvent] = useState<SavedEvent | null>(null);
+
+  // Edit Event State
+  const [editingEvent, setEditingEvent] = useState<SavedEvent | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Filters & Views
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
@@ -448,6 +453,18 @@ export function EventPlanner() {
                         <Button
                           size="sm"
                           variant="secondary"
+                          className="h-8 text-xs font-semibold text-foreground hover:bg-muted border"
+                          onClick={() => {
+                            setEditingEvent(evt);
+                            setEditModalOpen(true);
+                          }}
+                        >
+                          <Edit2 className="mr-1 h-3.5 w-3.5 text-gold" /> Bewerken
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           className="h-8 text-xs font-semibold text-gold hover:bg-gold/10 border border-gold/30"
                           onClick={() => setActiveQuoteEvent(evt)}
                         >
@@ -495,6 +512,19 @@ export function EventPlanner() {
           defaultEventDate={activeQuoteEvent.eventDate}
           defaultEventTime={activeQuoteEvent.eventTime}
           defaultQuoteNumber={activeQuoteEvent.quoteNumber}
+        />
+      )}
+
+      {/* Edit Event Modal */}
+      {editingEvent && (
+        <EditEventModal
+          event={editingEvent}
+          open={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingEvent(null);
+          }}
+          onEventUpdated={loadEvents}
         />
       )}
     </div>

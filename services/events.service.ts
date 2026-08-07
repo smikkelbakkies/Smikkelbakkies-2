@@ -483,6 +483,72 @@ export async function updateEventStatus(eventId: string, newStatus: SavedEventSt
   return all.find((e) => e.id === eventId) || all[0];
 }
 
+export async function updateEvent(eventId: string, data: Partial<SavedEvent>): Promise<SavedEvent> {
+  const localBefore = getLocalStorageEvents();
+  const index = localBefore.findIndex((e) => e.id === eventId);
+  const existing = localBefore[index] || savedEvents.find((e) => e.id === eventId);
+
+  if (!existing) {
+    throw new Error("Event niet gevonden");
+  }
+
+  const updated: SavedEvent = {
+    ...existing,
+    ...data,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (index !== -1) {
+    localBefore[index] = updated;
+    setLocalStorageEvents(localBefore);
+  } else {
+    setLocalStorageEvents([updated, ...localBefore]);
+  }
+
+  const sIndex = savedEvents.findIndex((e) => e.id === eventId);
+  if (sIndex !== -1) {
+    savedEvents[sIndex] = updated;
+  } else {
+    savedEvents.unshift(updated);
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    const formattedLocation = updated.location ? `${updated.clientName} - ${updated.location}` : updated.clientName;
+    const fullPayload: any = {
+      id: updated.id,
+      name: updated.eventName,
+      event_date: updated.eventDate,
+      location: formattedLocation,
+      people_count: updated.params?.peopleCount,
+      travel_hours: updated.params?.travelHours,
+      service_hours: updated.params?.serviceHours,
+      setup_hours: updated.params?.setupHours,
+      fixed_costs: updated.params?.fixedCosts,
+      target_event_margin: updated.params?.targetEventMargin,
+      status: updated.status,
+      notes: updated.notes,
+      params: updated.params,
+      calculation: updated.calculation,
+      updated_at: updated.updatedAt
+    };
+
+    try {
+      let { error } = await supabase.from("events").upsert(fullPayload);
+      if (error) {
+        delete fullPayload.status;
+        delete fullPayload.notes;
+        delete fullPayload.params;
+        delete fullPayload.calculation;
+        await supabase.from("events").upsert(fullPayload);
+      }
+    } catch (err) {
+      console.warn("Supabase updateEvent error:", err);
+    }
+  }
+
+  return updated;
+}
+
 export async function deleteSavedEvent(eventId: string): Promise<void> {
   savedEvents = savedEvents.filter((e) => e.id !== eventId);
 
