@@ -41,6 +41,7 @@ export type Ingredient = {
   primarySupplierId: string | null;
   supplierArticleCode?: string; // Groothandel artikelcode / SKU (bijv. HGZ-BR-60)
   baseUnit: BaseUnit;
+  portionWeight?: number; // Optioneel: gewicht van 1 portie in grammen
   purchaseUnit: string;
   packageContent: number;
   purchasePrice: number;

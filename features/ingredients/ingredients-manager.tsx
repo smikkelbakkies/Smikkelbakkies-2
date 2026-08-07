@@ -384,6 +384,7 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     baseUnit: ingredient?.baseUnit ?? "stuk",
     purchaseUnit: ingredient?.purchaseUnit ?? "doos",
     packageContent: ingredient?.packageContent ?? 1,
+    portionWeight: ingredient?.portionWeight ?? undefined,
     purchasePrice: ingredient?.purchasePrice ?? 0,
     isActive: ingredient?.isActive ?? true
   }));
@@ -417,6 +418,11 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
             {baseUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
           </Select>
         </Field>
+        {form.baseUnit === "portie" && (
+          <Field label="Gewicht per portie (gram/ml)">
+            <Input type="number" min="0" step="0.1" placeholder="bijv. 50" value={form.portionWeight || ""} onChange={(event) => setForm({ ...form, portionWeight: event.target.value ? Number(event.target.value) : undefined })} />
+          </Field>
+        )}
         <Field label="Inkoopeenheid"><Input value={form.purchaseUnit} onChange={(event) => setForm({ ...form, purchaseUnit: event.target.value })} /></Field>
         <Field label="Inhoud verpakking"><Input type="number" min="0.001" step="0.001" value={form.packageContent} onChange={(event) => setForm({ ...form, packageContent: Number(event.target.value) })} /></Field>
         <Field label="Inkoopprijs (€)"><Input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => setForm({ ...form, purchasePrice: Number(event.target.value) })} /></Field>
