@@ -493,6 +493,7 @@ export function EventPlanner() {
           defaultClientAddress={activeQuoteEvent.clientAddress}
           defaultClientCity={activeQuoteEvent.clientCity || activeQuoteEvent.location}
           defaultEventDate={activeQuoteEvent.eventDate}
+          defaultEventTime={activeQuoteEvent.eventTime}
           defaultQuoteNumber={activeQuoteEvent.quoteNumber}
         />
       )}

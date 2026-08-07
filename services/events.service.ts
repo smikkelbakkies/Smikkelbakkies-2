@@ -380,6 +380,7 @@ export async function listSavedEvents(): Promise<SavedEvent[]> {
 export async function saveEvent(data: {
   eventName: string;
   eventDate: string;
+  eventTime?: string;
   clientName: string;
   contactPerson?: string;
   clientEmail?: string;
@@ -396,6 +397,7 @@ export async function saveEvent(data: {
     id: crypto.randomUUID(),
     eventName: data.eventName || `Catering ${data.clientName}`,
     eventDate: data.eventDate || new Date().toISOString().split("T")[0],
+    eventTime: data.eventTime || "",
     clientName: data.clientName || "Opdrachtgever",
     contactPerson: data.contactPerson || "",
     clientEmail: data.clientEmail || "",

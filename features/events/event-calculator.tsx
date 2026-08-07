@@ -48,6 +48,7 @@ export function EventCalculator() {
   const [saveClientCity, setSaveClientCity] = useState("");
   const [saveQuoteNumber, setSaveQuoteNumber] = useState("");
   const [saveEventDate, setSaveEventDate] = useState("");
+  const [saveEventTime, setSaveEventTime] = useState("");
   const [saveLocation, setSaveLocation] = useState("");
 
   const { notify } = useToast();
@@ -135,6 +136,7 @@ export function EventCalculator() {
     setSaveClientCity("");
     setSaveQuoteNumber(generatedQuoteNumber);
     setSaveEventDate(new Date().toISOString().split("T")[0]);
+    setSaveEventTime("");
     setSaveLocation("");
     setSaveModalOpen(true);
   };
@@ -150,6 +152,7 @@ export function EventCalculator() {
       await saveEvent({
         eventName: saveEventName,
         eventDate: saveEventDate,
+        eventTime: saveEventTime,
         clientName: saveClientName,
         contactPerson: saveContactPerson,
         clientAddress: saveClientAddress,
@@ -306,7 +309,11 @@ export function EventCalculator() {
                       type="number"
                       step="0.5"
                       value={params.travelHours}
-                      onChange={(e) => setParams({ ...params, travelHours: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^0+(?=\d)/, '');
+                        setParams({ ...params, travelHours: parseFloat(val) || 0 });
+                      }}
+                      onBlur={(e) => e.target.value = parseFloat(e.target.value || "0").toString()}
                       className="h-9 text-xs"
                     />
                   </div>
@@ -316,7 +323,11 @@ export function EventCalculator() {
                       type="number"
                       step="0.5"
                       value={params.setupHours}
-                      onChange={(e) => setParams({ ...params, setupHours: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^0+(?=\d)/, '');
+                        setParams({ ...params, setupHours: parseFloat(val) || 0 });
+                      }}
+                      onBlur={(e) => e.target.value = parseFloat(e.target.value || "0").toString()}
                       className="h-9 text-xs"
                     />
                   </div>
@@ -326,7 +337,11 @@ export function EventCalculator() {
                       type="number"
                       step="0.5"
                       value={params.serviceHours}
-                      onChange={(e) => setParams({ ...params, serviceHours: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^0+(?=\d)/, '');
+                        setParams({ ...params, serviceHours: parseFloat(val) || 0 });
+                      }}
+                      onBlur={(e) => e.target.value = parseFloat(e.target.value || "0").toString()}
                       className="h-9 text-xs"
                     />
                   </div>
@@ -342,7 +357,11 @@ export function EventCalculator() {
                   <Input
                     type="number"
                     value={params.distanceKm}
-                    onChange={(e) => setParams({ ...params, distanceKm: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/^0+(?=\d)/, '');
+                      setParams({ ...params, distanceKm: parseFloat(val) || 0 });
+                    }}
+                    onBlur={(e) => e.target.value = parseFloat(e.target.value || "0").toString()}
                     className="h-9 text-xs"
                   />
                 </div>
@@ -365,7 +384,11 @@ export function EventCalculator() {
                   <Input
                     type="number"
                     value={params.fixedCosts}
-                    onChange={(e) => setParams({ ...params, fixedCosts: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/^0+(?=\d)/, '');
+                      setParams({ ...params, fixedCosts: parseFloat(val) || 0 });
+                    }}
+                    onBlur={(e) => e.target.value = parseFloat(e.target.value || "0").toString()}
                     className="h-9 text-xs"
                   />
                 </div>
@@ -376,7 +399,7 @@ export function EventCalculator() {
                 <label className="block text-xs font-medium text-muted-foreground mb-2">
                   Event Winstmarge Preset (Na Directe Kosten)
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {EVENT_MARGIN_PRESETS.map((margin) => (
                     <Button
                       key={margin}
@@ -385,9 +408,21 @@ export function EventCalculator() {
                       className={`h-9 text-xs ${params.targetEventMargin === margin ? "bg-gold text-background font-bold" : ""}`}
                       onClick={() => setParams({ ...params, targetEventMargin: margin })}
                     >
-                      {margin}% Marge
+                      {margin}%
                     </Button>
                   ))}
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      className="h-9 text-xs w-16 px-2 border-gold/30 focus-visible:ring-gold"
+                      value={params.targetEventMargin === 0 ? "" : params.targetEventMargin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^0+(?=\d)/, '');
+                        setParams({ ...params, targetEventMargin: parseFloat(val) || 0 });
+                      }}
+                    />
+                    <span className="text-[10px] text-muted-foreground">%</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -670,13 +705,24 @@ export function EventCalculator() {
                     onChange={(e) => setSaveQuoteNumber(e.target.value)}
                   />
                 </div>
-                <div>
-                  <DatePicker
-                    label="Datum Event"
-                    value={saveEventDate}
-                    onChange={(d) => setSaveEventDate(d)}
-                    align="right"
-                  />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <DatePicker
+                      label="Datum Event"
+                      value={saveEventDate}
+                      onChange={(d) => setSaveEventDate(d)}
+                      align="right"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[11px] font-semibold mb-1 text-foreground">Tijd (bijv. 18:00-20:00)</label>
+                    <Input
+                      value={saveEventTime}
+                      onChange={(e) => setSaveEventTime(e.target.value)}
+                      placeholder="18:00-20:00"
+                      className="h-9 text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -190,6 +190,7 @@ export type SavedEvent = {
   id: string;
   eventName: string;
   eventDate: string;
+  eventTime?: string;
   clientName: string;
   contactPerson?: string;
   clientEmail: string;

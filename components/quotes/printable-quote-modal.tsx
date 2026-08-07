@@ -19,6 +19,7 @@ interface PrintableQuoteModalProps {
   defaultClientAddress?: string;
   defaultClientCity?: string;
   defaultEventDate?: string;
+  defaultEventTime?: string;
   defaultQuoteNumber?: string;
 }
 
@@ -33,6 +34,7 @@ export function PrintableQuoteModal({
   defaultClientAddress = "",
   defaultClientCity = "",
   defaultEventDate = "",
+  defaultEventTime = "",
   defaultQuoteNumber = ""
 }: PrintableQuoteModalProps) {
   const [clientName, setClientName] = useState(defaultClientName || "Bedrijfsnaam / Klantnaam");
@@ -40,6 +42,7 @@ export function PrintableQuoteModal({
   const [clientAddress, setClientAddress] = useState(defaultClientAddress || "Straat en huisnummer");
   const [clientCity, setClientCity] = useState(defaultClientCity || "Postcode en plaats");
   const [eventDate, setEventDate] = useState(defaultEventDate || new Date().toISOString().split("T")[0]);
+  const [eventTime, setEventTime] = useState(defaultEventTime || "");
   const [quoteNumber, setQuoteNumber] = useState(defaultQuoteNumber || `OFF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999) + 1000}`);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -50,9 +53,10 @@ export function PrintableQuoteModal({
       if (defaultClientAddress) setClientAddress(defaultClientAddress);
       if (defaultClientCity) setClientCity(defaultClientCity);
       if (defaultEventDate) setEventDate(defaultEventDate);
+      if (defaultEventTime) setEventTime(defaultEventTime);
       if (defaultQuoteNumber) setQuoteNumber(defaultQuoteNumber);
     }
-  }, [open, defaultClientName, defaultContactPerson, defaultClientAddress, defaultClientCity, defaultEventDate, defaultQuoteNumber]);
+  }, [open, defaultClientName, defaultContactPerson, defaultClientAddress, defaultClientCity, defaultEventDate, defaultEventTime, defaultQuoteNumber]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,6 +157,10 @@ export function PrintableQuoteModal({
               />
             </div>
             <div>
+              <label className="block font-medium mb-1">Tijd (bijv. 18:00-20:00)</label>
+              <Input value={eventTime} onChange={(e) => setEventTime(e.target.value)} placeholder="Tijd" />
+            </div>
+            <div>
               <label className="block font-medium mb-1">Offertenummer</label>
               <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} />
             </div>
@@ -204,7 +212,7 @@ export function PrintableQuoteModal({
               </div>
               <div className="grid grid-cols-[110px_1fr] gap-1">
                 <span className="font-bold">Leverdatum:</span>
-                <span>{formatDate(eventDate)}</span>
+                <span>{formatDate(eventDate)} {eventTime && `- ${eventTime}`}</span>
               </div>
               <div className="grid grid-cols-[110px_1fr] gap-1">
                 <span className="font-bold">Uw referentie:</span>
@@ -263,20 +271,7 @@ export function PrintableQuoteModal({
                   );
                 })}
 
-                {/* Service & Logistics */}
-                <tr>
-                  <td className="py-2.5 pr-2 pl-4">
-                    <span className="font-bold block">• Logistiek, Reiskosten & Disposables</span>
-                    <span className="text-[10px] text-gray-500">
-                      Inclusief {params.distanceKm} km reiskosten, op- en afbouw, servies, servetten en gastvrije bediening.
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-2 text-gray-500 font-mono">LOG-KM</td>
-                  <td className="py-2.5 px-2 text-center">1,00 pakket</td>
-                  <td className="py-2.5 px-2 text-right text-gray-500">Inbegrepen</td>
-                  <td className="py-2.5 px-2 text-center text-gray-500">9%</td>
-                  <td className="py-2.5 pl-2 text-right text-gray-500">Inbegrepen</td>
-                </tr>
+
               </tbody>
             </table>
           </div>
