@@ -198,6 +198,8 @@ export type SavedEvent = {
   clientAddress?: string;
   clientCity?: string;
   quoteNumber?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
   location: string;
   status: SavedEventStatus;
   params: EventPackageParams;

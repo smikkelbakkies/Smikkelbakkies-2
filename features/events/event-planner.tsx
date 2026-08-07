@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, FileText, Filter, MapPin, Plus, ShoppingCart, Trash2, Users, Utensils, Sparkles } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, FileText, Filter, MapPin, Plus, Receipt, ShoppingCart, Trash2, Users, Utensils, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { listProducts } from "@/services/recipes.service";
 import { PrintableQuoteModal } from "@/components/quotes/printable-quote-modal";
 import { EditEventModal } from "./edit-event-modal";
 import { EventOrderListModal } from "@/components/quotes/event-order-list-modal";
+import { PrintableInvoiceModal } from "@/components/quotes/printable-invoice-modal";
 
 const STATUS_CONFIG: Record<SavedEventStatus, { label: string; tone: "neutral" | "warning" | "success"; colorClass: string }> = {
   concept: { label: "Concept", tone: "neutral", colorClass: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
@@ -34,13 +35,11 @@ export function EventPlanner() {
   const [events, setEvents] = useState<SavedEvent[]>([]);
   const [products, setProducts] = useState<ProductWithCost[]>([]);
   const [loading, setLoading] = useState(true);
+  // Active Modals State
   const [activeQuoteEvent, setActiveQuoteEvent] = useState<SavedEvent | null>(null);
-
-  // Edit Event State
+  const [activeInvoiceEvent, setActiveInvoiceEvent] = useState<SavedEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<SavedEvent | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-
-  // Order List State
   const [orderListEvent, setOrderListEvent] = useState<SavedEvent | null>(null);
   const [orderListModalOpen, setOrderListModalOpen] = useState(false);
 
@@ -437,7 +436,12 @@ export function EventPlanner() {
                         </span>
                         {evt.quoteNumber && (
                           <span className="flex items-center gap-1 border px-1.5 py-0.5 rounded text-[10px] text-gold font-mono">
-                            🧾 {evt.quoteNumber}
+                            📄 {evt.quoteNumber}
+                          </span>
+                        )}
+                        {evt.invoiceNumber && (
+                          <span className="flex items-center gap-1 border px-1.5 py-0.5 rounded text-[10px] text-emerald-400 font-mono border-emerald-500/30 bg-emerald-500/10">
+                            🧾 {evt.invoiceNumber}
                           </span>
                         )}
                       </div>
@@ -486,6 +490,15 @@ export function EventPlanner() {
                           onClick={() => setActiveQuoteEvent(evt)}
                         >
                           <FileText className="mr-1 h-3.5 w-3.5" /> Offerte PDF
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30"
+                          onClick={() => setActiveInvoiceEvent(evt)}
+                        >
+                          <Receipt className="mr-1 h-3.5 w-3.5" /> Factuur PDF
                         </Button>
 
                         <select
@@ -554,6 +567,17 @@ export function EventPlanner() {
             setOrderListModalOpen(false);
             setOrderListEvent(null);
           }}
+        />
+      )}
+
+      {/* Printable A4 PDF Invoice Modal */}
+      {activeInvoiceEvent && (
+        <PrintableInvoiceModal
+          event={activeInvoiceEvent}
+          open={Boolean(activeInvoiceEvent)}
+          onClose={() => setActiveInvoiceEvent(null)}
+          products={products}
+          onEventUpdated={loadEvents}
         />
       )}
     </div>
