@@ -32,6 +32,10 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
+  // Paste Text Modal State (for Sligro/Hanos order confirmations & invoices)
+  const [pasteModalOpen, setPasteModalOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
   const { notify } = useToast();
 
   const loadData = async () => {
@@ -82,6 +86,64 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       notify({ title: "Fout bij prijs-sync" });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleProcessPastedText = async () => {
+    if (!pasteText.trim()) return;
+
+    let updatedCount = 0;
+    const timestamp = new Date().toISOString();
+    const updatedItemsList: Ingredient[] = [...items];
+
+    for (let i = 0; i < updatedItemsList.length; i++) {
+      const ing = updatedItemsList[i];
+      const code = (ing.supplierArticleCode || "").trim();
+      if (!code) continue;
+
+      // Regex to find article code followed or preceded by a price (€ XX,XX or XX.XX)
+      const codePos = pasteText.indexOf(code);
+      if (codePos !== -1) {
+        // Look at surrounding 150 characters around the code match
+        const snippet = pasteText.substring(Math.max(0, codePos - 50), Math.min(pasteText.length, codePos + 100));
+        const priceMatches = snippet.match(/€?\s*(\d{1,4}[.,]\d{2})/g);
+
+        if (priceMatches && priceMatches.length > 0) {
+          // Take the last price match in snippet (usually unit or total price)
+          const rawPrice = priceMatches[0].replace(/€/g, '').replace(/\s/g, '').replace(',', '.');
+          const parsedPrice = parseFloat(rawPrice);
+
+          if (!isNaN(parsedPrice) && parsedPrice > 0 && Math.abs(parsedPrice - ing.purchasePrice) > 0.001) {
+            const updatedIng: Ingredient = {
+              ...ing,
+              purchasePrice: parsedPrice,
+              pricePerBaseUnit: calculateUnitPrice(parsedPrice, ing.packageContent),
+              lastPriceUpdate: timestamp,
+              updatedAt: timestamp
+            };
+
+            await saveIngredientToDb(updatedIng);
+            updatedItemsList[i] = updatedIng;
+            updatedCount++;
+          }
+        }
+      }
+    }
+
+    setItems(updatedItemsList);
+    setPasteModalOpen(false);
+    setPasteText("");
+
+    if (updatedCount > 0) {
+      notify({
+        title: "Bestellijst Verwerkt!",
+        description: `✅ ${updatedCount} ingrediënt(en) automatisch bijgewerkt met de nieuwste inkoopprijzen.`
+      });
+    } else {
+      notify({
+        title: "Geen nieuwe prijsveranderingen gevonden",
+        description: "Alle herkende artikelcodes stonden al op de nieuwste prijs."
+      });
     }
   };
 
@@ -157,7 +219,12 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setPasteModalOpen(true)} className="h-9 text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+            <Tag className="mr-1.5 h-3.5 w-3.5" />
+            📋 Bestellijst / Factuur Plakken
+          </Button>
+
           <Button variant="secondary" size="sm" onClick={handlePriceSync} disabled={syncing} className="h-9 text-xs font-semibold border border-gold/40 text-gold hover:bg-gold/10">
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 text-gold ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Prijzen ophalen..." : "Live Prijs-Sync & Vergelijken"}
@@ -266,6 +333,51 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       <Dialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Ingrediënt Bewerken" : "Nieuw Ingrediënt Opslaan"}>
         <IngredientForm ingredient={editing} categories={categories} suppliers={supplierList} error={error} onSubmit={saveIngredient} />
       </Dialog>
+
+      {/* Paste Order Confirmation / Invoice Text Modal */}
+      {pasteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-xl border bg-background p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                  <Tag className="h-5 w-5 text-emerald-400" /> 📋 Sligro / Hanos Bestellijst of Factuur Plakken
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kopieer de bestel- of factuurtekst van Sligro/Hanos en plak deze hieronder. Het systeem herkent automatisch alle artikelcodes en prijzen!
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setPasteModalOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="block font-semibold text-foreground">Plak hier de tekst of tabel van je Sligro / Hanos bestelmail of factuur:</label>
+              <textarea
+                className="w-full h-48 rounded-lg border bg-black/40 p-3 font-mono text-xs text-foreground focus-visible:ring-gold"
+                placeholder="bijv:&#10;221705 American coleslaw € 4,00&#10;211493 Cheddar plakken € 11,79&#10;378063 Kesbeke augurkenblokjes € 11,09"
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-[11px] text-muted-foreground">
+                Matches worden automatisch gekoppeld op basis van artikelcodes (SKU's).
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setPasteModalOpen(false)} className="text-xs">
+                  Annuleren
+                </Button>
+                <Button size="sm" onClick={handleProcessPastedText} className="bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500">
+                  <Check className="mr-1.5 h-4 w-4" /> Verwerk en Update Prijzen
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Live Sync & Multi-Supplier Price Comparison Modal */}
       {syncModalOpen && (

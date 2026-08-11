@@ -34,8 +34,10 @@ export async function POST(req: Request) {
 
     const items: IngredientSyncItem[] = body.items && Array.isArray(body.items) ? body.items : [];
     const results: ArticlePriceQueryResult[] = [];
+    const sligroCookie = process.env.SLIGRO_COOKIE || body.sligroCookie || "";
+    const hanosCookie = process.env.HANOS_COOKIE || body.hanosCookie || "";
 
-    // As a fallback and performance optimization for known static prices (like the 50-pack burger we tested)
+    // As a fallback and performance optimization for known static prices
     const staticCache: Record<string, { price: number; name: string }> = {
       "59920": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", price: 37.48 },
       "3284216": { name: "METRO Chef Hamburger Amerikaans (20 stuks / 2,5 kg)", price: 37.48 },
@@ -72,9 +74,19 @@ export async function POST(req: Request) {
       else if (SCRAPER_API_KEY) {
         try {
           const targetUrl = directUrl || `https://www.makro.nl/marketplace/product/${code}`;
-          const scraperApiUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}`;
+          let scraperApiUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}`;
           
-          const response = await fetch(scraperApiUrl);
+          const fetchHeaders: Record<string, string> = {};
+          let activeCookie = "";
+          if (supplierDisplay === "Sligro" && sligroCookie) activeCookie = sligroCookie;
+          if (supplierDisplay === "Hanos" && hanosCookie) activeCookie = hanosCookie;
+
+          if (activeCookie) {
+            scraperApiUrl += `&keep_headers=true`;
+            fetchHeaders["Cookie"] = activeCookie;
+          }
+
+          const response = await fetch(scraperApiUrl, { headers: fetchHeaders });
           
           if (response.ok) {
             const html = await response.text();
