@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, ShoppingCart, Check, Copy, Printer, ArrowLeft, Building2, ExternalLink } from "lucide-react";
+import { X, ShoppingCart, Check, Copy, Printer, ArrowLeft, Building2, ExternalLink, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -21,10 +21,12 @@ export function EventOrderListModal({ event, open, onClose }: EventOrderListModa
   const [loading, setLoading] = useState(true);
   const [copiedSupplierId, setCopiedSupplierId] = useState<string | null>(null);
 
+  const [useCheapestSuppliers, setUseCheapestSuppliers] = useState(true);
+
   useEffect(() => {
     if (open && event) {
       setLoading(true);
-      generateEventOrderList(event.params.peopleCount, event.params.selectedProducts)
+      generateEventOrderList(event.params.peopleCount, event.params.selectedProducts, useCheapestSuppliers)
         .then((groups) => {
           setOrderGroups(groups);
           setLoading(false);
@@ -34,7 +36,7 @@ export function EventOrderListModal({ event, open, onClose }: EventOrderListModa
           setLoading(false);
         });
     }
-  }, [open, event]);
+  }, [open, event, useCheapestSuppliers]);
 
   if (!open || !event) return null;
 
@@ -179,6 +181,20 @@ export function EventOrderListModal({ event, open, onClose }: EventOrderListModa
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={useCheapestSuppliers ? "default" : "secondary"}
+              onClick={() => setUseCheapestSuppliers(!useCheapestSuppliers)}
+              className={`h-9 text-xs font-bold ${
+                useCheapestSuppliers
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm"
+                  : "border-gold/40 text-gold hover:bg-gold/10"
+              }`}
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              {useCheapestSuppliers ? "🌟 Voordeligste Opties Actief" : "👑 Gebruik Voordeligste Opties"}
+            </Button>
+
             <Button size="sm" onClick={handlePrintAll} className="h-9 bg-gold text-background font-bold text-xs hover:bg-gold/90">
               <Printer className="mr-1.5 h-4 w-4" /> Bestellijsten Afdrukken
             </Button>

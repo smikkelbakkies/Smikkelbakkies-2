@@ -38,6 +38,7 @@ export function EventCalculator() {
   const [copiedSupplierId, setCopiedSupplierId] = useState<string | null>(null);
   const [copiedQuote, setCopiedQuote] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [useCheapestSuppliers, setUseCheapestSuppliers] = useState(true);
 
   // Save Event Modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -71,9 +72,9 @@ export function EventCalculator() {
   useEffect(() => {
     if (params.selectedProducts.length > 0) {
       calculateEventPackage(params).then(setResult);
-      generateEventOrderList(params.peopleCount, params.selectedProducts).then(setOrderGroups);
+      generateEventOrderList(params.peopleCount, params.selectedProducts, useCheapestSuppliers).then(setOrderGroups);
     }
-  }, [params]);
+  }, [params, useCheapestSuppliers]);
 
   const handleAddProductRow = () => {
     if (products.length === 0) return;
@@ -641,7 +642,7 @@ export function EventCalculator() {
       {/* Supplier Procurement & Order List Section */}
       <Card className="border-gold/30">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-gold" /> 📋 Inkoop & Bestellijst voor Leveranciers
@@ -650,7 +651,22 @@ export function EventCalculator() {
                 Automatisch berekend op basis van {params.peopleCount} gasten en {totalBurgersToBake} te bakken burgers (afgerond naar hele verpakkingen).
               </p>
             </div>
-            <Badge tone="success">{orderGroups.length} Leverancier(s)</Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={useCheapestSuppliers ? "default" : "secondary"}
+                onClick={() => setUseCheapestSuppliers(!useCheapestSuppliers)}
+                className={`h-8 text-xs font-bold ${
+                  useCheapestSuppliers
+                    ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm"
+                    : "border-gold/40 text-gold hover:bg-gold/10"
+                }`}
+              >
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {useCheapestSuppliers ? "🌟 Voordeligste Opties Actief" : "👑 Gebruik Voordeligste Opties"}
+              </Button>
+              <Badge tone="success">{orderGroups.length} Leverancier(s)</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

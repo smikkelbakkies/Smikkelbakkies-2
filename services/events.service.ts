@@ -165,7 +165,8 @@ export async function calculateFestivalEvent(params: FestivalEventParams): Promi
 
 export async function generateEventOrderList(
   peopleCount: number,
-  selectedProducts: { productId: string; quantityPerPerson: number }[]
+  selectedProducts: { productId: string; quantityPerPerson: number }[],
+  useCheapestSuppliers: boolean = false
 ): Promise<SupplierOrderGroup[]> {
   const [products, ingredients, suppliers] = await Promise.all([
     listProducts(),
@@ -197,22 +198,40 @@ export async function generateEventOrderList(
     const ing = ingredientMap.get(ingredientId);
     if (!ing) continue;
 
-    const supplierId = ing.primarySupplierId || "unassigned";
+    let supplierId = ing.primarySupplierId || "unassigned";
+    let articleCode = ing.supplierArticleCode;
+    let productUrl = ing.productUrl;
+    let purchaseUnit = ing.purchaseUnit;
+    let packageContent = ing.packageContent;
+    let purchasePrice = ing.purchasePrice;
 
-    const packagesToOrder = Math.ceil(neededAmount / ing.packageContent);
-    const totalCost = packagesToOrder * ing.purchasePrice;
+    // Pick supplier option with lowest price per base unit if useCheapestSuppliers is true
+    if (useCheapestSuppliers && ing.supplierOptions && ing.supplierOptions.length > 0) {
+      const cheapestOpt = [...ing.supplierOptions].sort((a, b) => a.pricePerBaseUnit - b.pricePerBaseUnit)[0];
+      if (cheapestOpt) {
+        supplierId = cheapestOpt.supplierId;
+        articleCode = cheapestOpt.supplierArticleCode || articleCode;
+        productUrl = cheapestOpt.productUrl || productUrl;
+        purchaseUnit = cheapestOpt.purchaseUnit || purchaseUnit;
+        packageContent = cheapestOpt.packageContent || packageContent;
+        purchasePrice = cheapestOpt.purchasePrice || purchasePrice;
+      }
+    }
+
+    const packagesToOrder = Math.ceil(neededAmount / packageContent);
+    const totalCost = packagesToOrder * purchasePrice;
 
     const orderItem: SupplierOrderItem = {
       ingredientId: ing.id,
       ingredientName: ing.name,
-      supplierArticleCode: ing.supplierArticleCode,
-      productUrl: ing.productUrl,
+      supplierArticleCode: articleCode,
+      productUrl,
       totalBaseUnitsNeeded: neededAmount,
       baseUnit: ing.baseUnit,
-      purchaseUnit: ing.purchaseUnit,
-      packageContent: ing.packageContent,
+      purchaseUnit,
+      packageContent,
       packagesToOrder,
-      purchasePricePerPackage: ing.purchasePrice,
+      purchasePricePerPackage: purchasePrice,
       totalEstimatedCost: totalCost
     };
 
