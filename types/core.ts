@@ -26,6 +26,7 @@ export type SupplierPriceOption = {
   supplierId: string;
   supplierName: string;
   supplierArticleCode?: string;
+  productUrl?: string; // Direct link to wholesaler product page
   purchaseUnit: string;
   packageContent: number;
   purchasePrice: number;
@@ -40,6 +41,7 @@ export type Ingredient = {
   categoryId: string;
   primarySupplierId: string | null;
   supplierArticleCode?: string; // Groothandel artikelcode / SKU (bijv. HGZ-BR-60)
+  productUrl?: string; // Direct link to wholesaler product page
   baseUnit: BaseUnit;
   portionWeight?: number; // Optioneel: gewicht van 1 portie in grammen
   purchaseUnit: string;
@@ -166,6 +168,8 @@ export type EventCalculationResult = {
 export type SupplierOrderItem = {
   ingredientId: string;
   ingredientName: string;
+  supplierArticleCode?: string;
+  productUrl?: string;
   totalBaseUnitsNeeded: number;
   baseUnit: string;
   purchaseUnit: string;

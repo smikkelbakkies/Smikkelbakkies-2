@@ -68,6 +68,7 @@ export async function listIngredients(): Promise<Ingredient[]> {
       const parsed: Ingredient[] = data.map((item) => {
         const local = localItemsMap.get(item.id);
         const articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
+        const productUrl = item.product_url || local?.productUrl || undefined;
 
         return {
           id: item.id,
@@ -75,6 +76,7 @@ export async function listIngredients(): Promise<Ingredient[]> {
           categoryId: item.category_id,
           primarySupplierId: item.primary_supplier_id,
           supplierArticleCode: articleCode,
+          productUrl: productUrl,
           baseUnit: item.base_unit,
           purchaseUnit: item.purchase_unit,
           packageContent: Number(item.package_content),
@@ -116,6 +118,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     categoryId: sanitizedCategoryId,
     primarySupplierId: sanitizedSupplierId,
     supplierArticleCode: ingredient.supplierArticleCode?.trim() || undefined,
+    productUrl: ingredient.productUrl?.trim() || undefined,
     pricePerBaseUnit: unitPrice,
     updatedAt: timestamp
   };
@@ -140,6 +143,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
       category_id: sanitizedIngredient.categoryId,
       primary_supplier_id: sanitizedIngredient.primarySupplierId,
       supplier_article_code: sanitizedIngredient.supplierArticleCode || null,
+      product_url: sanitizedIngredient.productUrl || null,
       base_unit: sanitizedIngredient.baseUnit,
       purchase_unit: sanitizedIngredient.purchaseUnit,
       package_content: sanitizedIngredient.packageContent,
@@ -152,6 +156,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
 
     if (error) {
       delete fullPayload.supplier_article_code;
+      delete fullPayload.product_url;
       const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
       if (fallbackResult.error) {
         console.error("Supabase ingredient save fallback error:", fallbackResult.error);
@@ -206,11 +211,12 @@ export async function syncIngredientPricesByArticleCode(currentItems: Ingredient
 
   // Build sync items payload with current entered prices and supplier name
   const itemsPayload = currentItems
-    .filter((i) => i.supplierArticleCode && i.supplierArticleCode.trim().length > 0)
+    .filter((i) => (i.supplierArticleCode && i.supplierArticleCode.trim().length > 0) || (i.productUrl && i.productUrl.trim().length > 0))
     .map((i) => ({
       id: i.id,
       name: i.name,
-      supplierArticleCode: i.supplierArticleCode!.trim(),
+      supplierArticleCode: i.supplierArticleCode?.trim() || "",
+      productUrl: i.productUrl?.trim() || "",
       currentPrice: i.purchasePrice,
       supplierName: i.primarySupplierId ? supplierMap.get(i.primarySupplierId) || "Makro Breda" : "Makro Breda"
     }));

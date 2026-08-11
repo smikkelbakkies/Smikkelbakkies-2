@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, DollarSign, FileText, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Sparkles, Trash2, Users, Utensils, Zap, X } from "lucide-react";
+import { AlertCircle, BookmarkPlus, Calculator, Check, CheckCircle2, Clock, Copy, DollarSign, ExternalLink, FileText, Fuel, MessageSquare, Plus, Printer, ShoppingCart, Sparkles, Trash2, Users, Utensils, Zap, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -674,10 +674,23 @@ export function EventCalculator() {
                   <div className="space-y-2 text-xs">
                     {group.items.map((item) => (
                       <div key={item.ingredientId} className="flex items-center justify-between rounded-lg border bg-muted/30 p-2.5">
-                        <div>
-                          <span className="font-medium block text-foreground">{item.ingredientName}</span>
-                          <span className="text-[10px] text-muted-foreground">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{item.ingredientName}</span>
+                            {item.productUrl && (
+                              <a
+                                href={item.productUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline font-bold"
+                              >
+                                <ExternalLink className="h-3 w-3 text-gold" /> Webshop
+                              </a>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground block">
                             Nodig: {item.totalBaseUnitsNeeded.toFixed(0)} {item.baseUnit} (Verpakking: {item.packageContent} {item.baseUnit})
+                            {item.supplierArticleCode && ` • SKU: ${item.supplierArticleCode}`}
                           </span>
                         </div>
                         <div className="text-right">

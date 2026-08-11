@@ -205,6 +205,8 @@ export async function generateEventOrderList(
     const orderItem: SupplierOrderItem = {
       ingredientId: ing.id,
       ingredientName: ing.name,
+      supplierArticleCode: ing.supplierArticleCode,
+      productUrl: ing.productUrl,
       totalBaseUnitsNeeded: neededAmount,
       baseUnit: ing.baseUnit,
       purchaseUnit: ing.purchaseUnit,

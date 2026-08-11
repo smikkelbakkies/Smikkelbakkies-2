@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, X } from "lucide-react";
+import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, ExternalLink, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -197,11 +197,22 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
                   return (
                     <tr key={ingredient.id} className="border-t transition hover:bg-muted/30">
                       <td className="px-4 py-3 text-xs font-mono text-gold">
-                        {ingredient.supplierArticleCode ? (
+                        {ingredient.supplierArticleCode && (
                           <span className="flex items-center gap-1">
                             <Tag className="h-3 w-3" /> {ingredient.supplierArticleCode}
                           </span>
-                        ) : (
+                        )}
+                        {ingredient.productUrl && (
+                          <a
+                            href={ingredient.productUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline font-semibold mt-0.5"
+                          >
+                            <ExternalLink className="h-3 w-3 text-gold" /> Webshop Link
+                          </a>
+                        )}
+                        {!ingredient.supplierArticleCode && !ingredient.productUrl && (
                           <span className="text-muted-foreground text-[11px]">-</span>
                         )}
                       </td>
@@ -381,6 +392,7 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     categoryId: ingredient?.categoryId ?? categories[0]?.id ?? "",
     primarySupplierId: ingredient?.primarySupplierId ?? suppliers[0]?.id ?? null,
     supplierArticleCode: ingredient?.supplierArticleCode ?? "",
+    productUrl: ingredient?.productUrl ?? "",
     baseUnit: ingredient?.baseUnit ?? "stuk",
     purchaseUnit: ingredient?.purchaseUnit ?? "doos",
     packageContent: ingredient?.packageContent ?? 1,
@@ -410,6 +422,14 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Naam Ingrediënt"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
         <Field label="Artikelcode Groothandel (SKU)"><Input placeholder="bijv. HGZ-BR-60" value={form.supplierArticleCode} onChange={(event) => setForm({ ...form, supplierArticleCode: event.target.value })} /></Field>
+        <Field label="Directe Webshop Link (Product URL)">
+          <Input
+            type="url"
+            placeholder="https://www.makro.nl/shop/pv/..."
+            value={form.productUrl || ""}
+            onChange={(event) => setForm({ ...form, productUrl: event.target.value })}
+          />
+        </Field>
         <Field label="Categorie">
           <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
             {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}

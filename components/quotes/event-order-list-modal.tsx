@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, ShoppingCart, Check, Copy, Printer, ArrowLeft, Building2 } from "lucide-react";
+import { X, ShoppingCart, Check, Copy, Printer, ArrowLeft, Building2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -52,7 +52,9 @@ export function EventOrderListModal({ event, open, onClose }: EventOrderListModa
     text += `-----------------------------------\n`;
 
     group.items.forEach((item) => {
-      text += `• ${item.ingredientName}: ${item.packagesToOrder}x ${item.purchaseUnit} (${item.totalBaseUnitsNeeded.toFixed(0)} ${item.baseUnit} nodig)\n`;
+      let line = `• ${item.ingredientName}: ${item.packagesToOrder}x ${item.purchaseUnit} (${item.totalBaseUnitsNeeded.toFixed(0)} ${item.baseUnit} nodig)`;
+      if (item.productUrl) line += ` - ${item.productUrl}`;
+      text += line + "\n";
     });
 
     text += `-----------------------------------\n`;
@@ -230,10 +232,23 @@ export function EventOrderListModal({ event, open, onClose }: EventOrderListModa
                   <div className="space-y-2">
                     {group.items.map((item) => (
                       <div key={item.ingredientId} className="flex items-center justify-between rounded-lg border bg-muted/30 p-2.5">
-                        <div>
-                          <span className="font-semibold block text-foreground">{item.ingredientName}</span>
-                          <span className="text-[10px] text-muted-foreground">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-foreground">{item.ingredientName}</span>
+                            {item.productUrl && (
+                              <a
+                                href={item.productUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline font-bold"
+                              >
+                                <ExternalLink className="h-3 w-3 text-gold" /> Webshop Link
+                              </a>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground block">
                             Nodig: {item.totalBaseUnitsNeeded.toFixed(0)} {item.baseUnit} ({item.packageContent} {item.baseUnit}/pkg)
+                            {item.supplierArticleCode && ` • SKU: ${item.supplierArticleCode}`}
                           </span>
                         </div>
                         <div className="text-right">

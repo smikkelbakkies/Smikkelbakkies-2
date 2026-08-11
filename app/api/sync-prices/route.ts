@@ -4,7 +4,8 @@ import * as cheerio from "cheerio";
 interface IngredientSyncItem {
   id: string;
   name: string;
-  supplierArticleCode: string;
+  supplierArticleCode?: string;
+  productUrl?: string;
   currentPrice: number;
   supplierName?: string;
 }
@@ -43,14 +44,15 @@ export async function POST(req: Request) {
 
     for (const item of items) {
       const code = (item.supplierArticleCode || "").trim().toUpperCase();
-      if (!code) continue;
+      const directUrl = (item.productUrl || "").trim();
+      if (!code && !directUrl) continue;
 
       let scrapedPrice = item.currentPrice;
       let scrapedName = item.name;
       let found = false;
 
       // 1. Check static cache first
-      if (staticCache[code]) {
+      if (code && staticCache[code]) {
         scrapedPrice = staticCache[code].price;
         scrapedName = staticCache[code].name;
         found = true;
@@ -58,8 +60,8 @@ export async function POST(req: Request) {
       // 2. Real Web Scraping using ScraperAPI
       else if (SCRAPER_API_KEY) {
         try {
-          const makroUrl = `https://www.makro.nl/marketplace/product/${code}`;
-          const scraperApiUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(makroUrl)}`;
+          const targetUrl = directUrl || `https://www.makro.nl/marketplace/product/${code}`;
+          const scraperApiUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}`;
           
           const response = await fetch(scraperApiUrl);
           
