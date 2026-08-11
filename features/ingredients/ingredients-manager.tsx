@@ -398,8 +398,19 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     packageContent: ingredient?.packageContent ?? 1,
     portionWeight: ingredient?.portionWeight ?? undefined,
     purchasePrice: ingredient?.purchasePrice ?? 0,
+    supplierOptions: ingredient?.supplierOptions ?? [],
     isActive: ingredient?.isActive ?? true
   }));
+
+  // New Supplier Option Form State
+  const [newSupId, setNewSupId] = useState<string>(suppliers[0]?.id || "");
+  const [newSku, setNewSku] = useState<string>("");
+  const [newUrl, setNewUrl] = useState<string>("");
+  const [newUnit, setNewUnit] = useState<string>("doos");
+  const [newContent, setNewContent] = useState<number>(1);
+  const [newPrice, setNewPrice] = useState<number>(0);
+  const [showAddOption, setShowAddOption] = useState<boolean>(false);
+
   const unitPrice = calculateUnitPrice(form.purchasePrice, form.packageContent);
 
   let portionPriceInfo = "";
@@ -410,53 +421,278 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     portionPriceInfo = `(€ ${pPrice.toFixed(2)} / portie)`;
   }
 
+  const handleAddSupplierOption = () => {
+    if (!newSupId || newPrice <= 0 || newContent <= 0) return;
+    const supObj = suppliers.find((s) => s.id === newSupId);
+    const calculatedPerUnit = calculateUnitPrice(newPrice, newContent);
+
+    const newOption: SupplierPriceOption = {
+      supplierId: newSupId,
+      supplierName: supObj?.name || "Onbekend",
+      supplierArticleCode: newSku.trim() || undefined,
+      productUrl: newUrl.trim() || undefined,
+      purchaseUnit: newUnit.trim() || "doos",
+      packageContent: newContent,
+      purchasePrice: newPrice,
+      pricePerBaseUnit: calculatedPerUnit,
+      isPrimary: false,
+      lastUpdated: new Date().toISOString()
+    };
+
+    const updatedOptions = [...(form.supplierOptions || []).filter((o) => o.supplierId !== newSupId), newOption];
+    setForm({ ...form, supplierOptions: updatedOptions });
+
+    // Reset add form
+    setNewSku("");
+    setNewUrl("");
+    setNewPrice(0);
+    setShowAddOption(false);
+  };
+
+  const handleMakePrimaryOption = (opt: SupplierPriceOption) => {
+    const calculatedPerUnit = calculateUnitPrice(opt.purchasePrice, opt.packageContent);
+    setForm({
+      ...form,
+      primarySupplierId: opt.supplierId,
+      supplierArticleCode: opt.supplierArticleCode || "",
+      productUrl: opt.productUrl || "",
+      purchaseUnit: opt.purchaseUnit,
+      packageContent: opt.packageContent,
+      purchasePrice: opt.purchasePrice
+    });
+  };
+
+  const handleRemoveOption = (supplierId: string) => {
+    const updatedOptions = (form.supplierOptions || []).filter((o) => o.supplierId !== supplierId);
+    setForm({ ...form, supplierOptions: updatedOptions });
+  };
+
   return (
     <form
-      className="grid gap-4"
+      className="grid gap-5"
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit(form);
+
+        // Build composite supplierOptions including the primary supplier
+        const primarySupObj = suppliers.find((s) => s.id === form.primarySupplierId);
+        const primaryOpt: SupplierPriceOption = {
+          supplierId: form.primarySupplierId || "unassigned",
+          supplierName: primarySupObj?.name || "Primaire Leverancier",
+          supplierArticleCode: form.supplierArticleCode,
+          productUrl: form.productUrl,
+          purchaseUnit: form.purchaseUnit,
+          packageContent: form.packageContent,
+          purchasePrice: form.purchasePrice,
+          pricePerBaseUnit: unitPrice,
+          isPrimary: true,
+          lastUpdated: new Date().toISOString()
+        };
+
+        const otherOptions = (form.supplierOptions || [])
+          .filter((o) => o.supplierId !== form.primarySupplierId)
+          .map((o) => ({ ...o, isPrimary: false }));
+
+        const finalForm: IngredientForm = {
+          ...form,
+          supplierOptions: [primaryOpt, ...otherOptions]
+        };
+
+        onSubmit(finalForm);
       }}
     >
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Naam Ingrediënt"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-        <Field label="Artikelcode Groothandel (SKU)"><Input placeholder="bijv. HGZ-BR-60" value={form.supplierArticleCode} onChange={(event) => setForm({ ...form, supplierArticleCode: event.target.value })} /></Field>
-        <Field label="Directe Webshop Link (Product URL)">
-          <Input
-            type="url"
-            placeholder="https://www.makro.nl/shop/pv/..."
-            value={form.productUrl || ""}
-            onChange={(event) => setForm({ ...form, productUrl: event.target.value })}
-          />
-        </Field>
-        <Field label="Categorie">
-          <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Leverancier">
-          <Select value={form.primarySupplierId ?? ""} onChange={(event) => setForm({ ...form, primarySupplierId: event.target.value || null })}>
-            {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Basiseenheid">
-          <Select value={form.baseUnit} onChange={(event) => setForm({ ...form, baseUnit: event.target.value as BaseUnit })}>
-            {baseUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-          </Select>
-        </Field>
-        {form.baseUnit !== "stuk" && (
-          <Field label={form.baseUnit === "portie" ? "Gewicht per portie (gram/ml)" : "Optioneel: Portiegrootte (gram/ml)"}>
-            <Input type="number" min="0" step="0.1" placeholder="bijv. 50" value={form.portionWeight || ""} onChange={(event) => setForm({ ...form, portionWeight: event.target.value ? Number(event.target.value) : undefined })} />
+      
+      {/* Primary Supplier Section */}
+      <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+        <h4 className="font-bold text-xs text-gold flex items-center gap-1.5 uppercase tracking-wider">
+          <Building2 className="h-4 w-4" /> Primaire Leverancier & Inkoopprijs
+        </h4>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Naam Ingrediënt"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+          <Field label="Primaire Leverancier">
+            <Select value={form.primarySupplierId ?? ""} onChange={(event) => setForm({ ...form, primarySupplierId: event.target.value || null })}>
+              {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+            </Select>
           </Field>
-        )}
-        <Field label="Inkoopeenheid"><Input value={form.purchaseUnit} onChange={(event) => setForm({ ...form, purchaseUnit: event.target.value })} /></Field>
-        <Field label="Inhoud verpakking"><Input type="number" min="0.001" step="0.001" value={form.packageContent} onChange={(event) => setForm({ ...form, packageContent: Number(event.target.value) })} /></Field>
-        <Field label="Inkoopprijs (€)"><Input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => setForm({ ...form, purchasePrice: Number(event.target.value) })} /></Field>
-        <Field label="Prijs per basiseenheid"><Input readOnly value={`${formatCurrency(unitPrice)} ${portionPriceInfo}`.trim()} /></Field>
+          <Field label="Artikelcode Groothandel (SKU)"><Input placeholder="bijv. HGZ-BR-60" value={form.supplierArticleCode} onChange={(event) => setForm({ ...form, supplierArticleCode: event.target.value })} /></Field>
+          <Field label="Directe Webshop Link (Product URL)">
+            <Input
+              type="url"
+              placeholder="https://www.makro.nl/shop/pv/..."
+              value={form.productUrl || ""}
+              onChange={(event) => setForm({ ...form, productUrl: event.target.value })}
+            />
+          </Field>
+          <Field label="Categorie">
+            <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Basiseenheid">
+            <Select value={form.baseUnit} onChange={(event) => setForm({ ...form, baseUnit: event.target.value as BaseUnit })}>
+              {baseUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+            </Select>
+          </Field>
+          {form.baseUnit !== "stuk" && (
+            <Field label={form.baseUnit === "portie" ? "Gewicht per portie (gram/ml)" : "Optioneel: Portiegrootte (gram/ml)"}>
+              <Input type="number" min="0" step="0.1" placeholder="bijv. 50" value={form.portionWeight || ""} onChange={(event) => setForm({ ...form, portionWeight: event.target.value ? Number(event.target.value) : undefined })} />
+            </Field>
+          )}
+          <Field label="Inkoopeenheid"><Input value={form.purchaseUnit} onChange={(event) => setForm({ ...form, purchaseUnit: event.target.value })} /></Field>
+          <Field label="Inhoud verpakking"><Input type="number" min="0.001" step="0.001" value={form.packageContent} onChange={(event) => setForm({ ...form, packageContent: Number(event.target.value) })} /></Field>
+          <Field label="Inkoopprijs (€)"><Input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => setForm({ ...form, purchasePrice: Number(event.target.value) })} /></Field>
+          <Field label="Prijs per basiseenheid"><Input readOnly className="font-bold text-gold" value={`${formatCurrency(unitPrice)} ${portionPriceInfo}`.trim()} /></Field>
+        </div>
       </div>
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="submit"><Plus className="h-4 w-4" />Opslaan</Button>
+
+      {/* Multi-Supplier Price Comparison Section */}
+      <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 p-4 text-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-gold" /> Extra Leveranciers & Prijzen Vergelijken (Makro, Hanos, Sligro, etc.)
+            </h4>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Voeg hetzelfde ingrediënt toe bij andere groothandels om automatisch de voordeligste optie te vinden.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-8 text-xs font-semibold border-gold/40 text-gold hover:bg-gold/10"
+            onClick={() => setShowAddOption(!showAddOption)}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> {showAddOption ? "Sluit Invoer" : "Leverancier Optie Toevoegen"}
+          </Button>
+        </div>
+
+        {/* Add New Supplier Option Box */}
+        {showAddOption && (
+          <div className="rounded-lg border bg-card p-3 space-y-3 shadow-sm border-gold/40">
+            <span className="font-bold text-xs text-gold block">Nieuwe Groothandel Optie Invoeren:</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Leverancier</label>
+                <Select value={newSupId} onChange={(e) => setNewSupId(e.target.value)}>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Artikelcode (SKU)</label>
+                <Input placeholder="bijv. HNS-9912" value={newSku} onChange={(e) => setNewSku(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Webshop Link (URL)</label>
+                <Input placeholder="https://..." value={newUrl} onChange={(e) => setNewUrl(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Inkoopeenheid</label>
+                <Input placeholder="emmer, doos, zak" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Inhoud ({form.baseUnit})</label>
+                <Input type="number" step="0.001" value={newContent} onChange={(e) => setNewContent(parseFloat(e.target.value) || 1)} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium mb-1">Inkoopprijs (€)</label>
+                <Input type="number" step="0.01" value={newPrice} onChange={(e) => setNewPrice(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="button" size="sm" onClick={handleAddSupplierOption} className="h-8 bg-gold text-background font-bold text-xs">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Bewaar Leverancier Optie
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Options List */}
+        {(form.supplierOptions || []).length === 0 ? (
+          <p className="text-[11px] text-muted-foreground italic py-1">
+            Nog geen extra leveranciers toegevoegd voor dit ingrediënt. Voeg er een toe om prijzen te vergelijken!
+          </p>
+        ) : (
+          <div className="space-y-2 pt-1">
+            {(form.supplierOptions || []).map((opt) => {
+              const isCurrentPrimary = opt.supplierId === form.primarySupplierId;
+              const isCheapest = (form.supplierOptions || []).every((o) => o.pricePerBaseUnit >= opt.pricePerBaseUnit);
+
+              return (
+                <div
+                  key={opt.supplierId}
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5 transition ${
+                    isCurrentPrimary
+                      ? "border-gold bg-gold/10 font-medium"
+                      : isCheapest
+                      ? "border-emerald-500/40 bg-emerald-500/5"
+                      : "bg-card/50"
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground text-xs flex items-center gap-1">
+                        <Building2 className="h-3.5 w-3.5 text-gold" /> {opt.supplierName}
+                      </span>
+                      {isCurrentPrimary && (
+                        <Badge tone="success" className="text-[10px]">👑 Primaire Leverancier</Badge>
+                      )}
+                      {isCheapest && !isCurrentPrimary && (
+                        <Badge tone="success" className="text-[10px] bg-emerald-500/20 text-emerald-400">🌟 Voordeligste Optie!</Badge>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground block">
+                      {formatCurrency(opt.purchasePrice)} per {opt.packageContent} {form.baseUnit} ({opt.purchaseUnit})
+                      {opt.supplierArticleCode && ` • SKU: ${opt.supplierArticleCode}`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="font-extrabold text-gold block text-xs">
+                        {formatCurrency(opt.pricePerBaseUnit)} / {form.baseUnit}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {!isCurrentPrimary && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-[10px] font-bold text-gold border border-gold/40 hover:bg-gold/10"
+                          onClick={() => handleMakePrimaryOption(opt)}
+                        >
+                          👑 Kies als Primair
+                        </Button>
+                      )}
+                      {!isCurrentPrimary && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveOption(opt.supplierId)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2 border-t">
+        <Button type="submit" className="bg-gold text-background font-bold text-xs hover:bg-gold/90">
+          <Plus className="mr-1.5 h-4 w-4" /> Ingrediënt & Prijzen Opslaan
+        </Button>
       </div>
     </form>
   );

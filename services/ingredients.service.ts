@@ -70,6 +70,8 @@ export async function listIngredients(): Promise<Ingredient[]> {
         const articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
         const productUrl = item.product_url || local?.productUrl || undefined;
 
+        const options = item.supplier_options || local?.supplierOptions || undefined;
+
         return {
           id: item.id,
           name: item.name,
@@ -82,6 +84,7 @@ export async function listIngredients(): Promise<Ingredient[]> {
           packageContent: Number(item.package_content),
           purchasePrice: Number(item.purchase_price),
           pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
+          supplierOptions: options,
           lastPriceUpdate: item.last_price_update || item.created_at,
           isActive: item.is_active,
           createdAt: item.created_at,
@@ -144,6 +147,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
       primary_supplier_id: sanitizedIngredient.primarySupplierId,
       supplier_article_code: sanitizedIngredient.supplierArticleCode || null,
       product_url: sanitizedIngredient.productUrl || null,
+      supplier_options: sanitizedIngredient.supplierOptions || null,
       base_unit: sanitizedIngredient.baseUnit,
       purchase_unit: sanitizedIngredient.purchaseUnit,
       package_content: sanitizedIngredient.packageContent,
@@ -157,6 +161,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     if (error) {
       delete fullPayload.supplier_article_code;
       delete fullPayload.product_url;
+      delete fullPayload.supplier_options;
       const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
       if (fallbackResult.error) {
         console.error("Supabase ingredient save fallback error:", fallbackResult.error);
