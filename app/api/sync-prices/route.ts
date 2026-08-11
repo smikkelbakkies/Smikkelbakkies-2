@@ -47,9 +47,20 @@ export async function POST(req: Request) {
       const directUrl = (item.productUrl || "").trim();
       if (!code && !directUrl) continue;
 
+      // Determine supplier display name and domain
+      let supplierDisplay = item.supplierName || "Groothandel";
+      if (directUrl.includes("sligro.nl") || (item.supplierName && item.supplierName.toLowerCase().includes("sligro"))) {
+        supplierDisplay = "Sligro";
+      } else if (directUrl.includes("hanos.nl") || (item.supplierName && item.supplierName.toLowerCase().includes("hanos"))) {
+        supplierDisplay = "Hanos";
+      } else if (directUrl.includes("makro.nl") || (item.supplierName && item.supplierName.toLowerCase().includes("makro"))) {
+        supplierDisplay = "Makro";
+      }
+
       let scrapedPrice = item.currentPrice;
       let scrapedName = item.name;
       let found = false;
+      let isBehindLoginWall = false;
 
       // 1. Check static cache first
       if (code && staticCache[code]) {
@@ -68,27 +79,26 @@ export async function POST(req: Request) {
           if (response.ok) {
             const html = await response.text();
             const $ = cheerio.load(html);
+
+            // Check if page redirected to a login wall (common on Sligro/Hanos B2B portals)
+            if (html.includes("inloggen") || html.includes("login") || html.includes("Inloggen bij Sligro") || html.includes("Mijn HANOS")) {
+              isBehindLoginWall = true;
+            }
             
-            // Makro.nl typically stores the exact pricing in a JSON-LD structured data block
-            // OR within specific CSS classes. We try JSON-LD first for maximum reliability.
             let priceFound = false;
             
+            // A. Structured JSON-LD Data Parsing
             $('script[type="application/ld+json"]').each((_, element) => {
               try {
                 const text = $(element).html();
                 if (text) {
                   const json = JSON.parse(text);
-                  // Look for product schema with offers
-                  if (json["@type"] === "Product" && json.offers && json.offers.price) {
-                    scrapedPrice = parseFloat(json.offers.price);
-                    if (json.name) scrapedName = json.name;
-                    priceFound = true;
-                  }
-                  // Sometimes it's nested or an array
-                  else if (Array.isArray(json)) {
-                    for (const obj of json) {
-                      if (obj["@type"] === "Product" && obj.offers && obj.offers.price) {
-                        scrapedPrice = parseFloat(obj.offers.price);
+                  const itemsToCheck = Array.isArray(json) ? json : [json];
+                  for (const obj of itemsToCheck) {
+                    if (obj["@type"] === "Product" && obj.offers) {
+                      const offer = Array.isArray(obj.offers) ? obj.offers[0] : obj.offers;
+                      if (offer && offer.price) {
+                        scrapedPrice = parseFloat(offer.price);
                         if (obj.name) scrapedName = obj.name;
                         priceFound = true;
                       }
@@ -96,44 +106,65 @@ export async function POST(req: Request) {
                   }
                 }
               } catch (e) {
-                // Ignore parse errors on individual scripts
+                // Ignore parse errors
               }
             });
 
-            // If JSON-LD didn't work, try HTML scraping fallback
+            // B. HTML Selectors Fallback (Makro, Sligro, Hanos, Bidfood)
             if (!priceFound) {
-               // Makro often uses .price or similar classes for the main price.
-               // It can be formatted like "14,99" or "14.99"
-               const priceText = $('.price').first().text().trim() || $('[data-test="product-price"]').first().text().trim();
-               if (priceText) {
+              const priceSelectors = [
+                '.price',
+                '[data-test="product-price"]',
+                '.product-detail__price',
+                '.product-price-amount',
+                '.c-price',
+                '.price-current',
+                '.price-number',
+                'meta[property="product:price:amount"]'
+              ];
+
+              for (const selector of priceSelectors) {
+                let priceText = "";
+                if (selector.startsWith("meta")) {
+                  priceText = $(selector).attr("content") || "";
+                } else {
+                  priceText = $(selector).first().text().trim();
+                }
+
+                if (priceText) {
                   const cleanPrice = priceText.replace(/[^0-9,.]/g, '').replace(',', '.');
                   const parsed = parseFloat(cleanPrice);
-                  if (!isNaN(parsed)) {
+                  if (!isNaN(parsed) && parsed > 0) {
                     scrapedPrice = parsed;
                     priceFound = true;
+                    break;
                   }
-               }
+                }
+              }
             }
             
             found = priceFound;
           }
         } catch (fetchErr) {
-          console.error(`ScraperAPI Error for ${code}:`, fetchErr);
+          console.error(`ScraperAPI Error for ${code || directUrl}:`, fetchErr);
         }
       }
 
       if (!found && !staticCache[code]) {
-         results.push({
+        let msg = `⚠️ Kan artikel ${code || item.name} niet uitlezen op ${supplierDisplay}.`;
+        if (isBehindLoginWall || supplierDisplay === "Sligro" || supplierDisplay === "Hanos") {
+          msg = `🔒 ${supplierDisplay} afgeschermd achter B2B inlogmuur. Gebruik de Webshop Link knop om direct de prijs op ${supplierDisplay} te bekijken.`;
+        }
+
+        results.push({
           ingredientId: item.id,
-          articleCode: code,
-          supplierName: item.supplierName || "Makro Breda",
+          articleCode: code || "LINK",
+          supplierName: supplierDisplay,
           oldPrice: item.currentPrice,
           newPurchasePrice: item.currentPrice,
           priceDelta: 0,
           status: SCRAPER_API_KEY ? "not_found" : "error",
-          message: SCRAPER_API_KEY 
-            ? `⚠️ Kan artikelcode ${code} niet vinden of prijs niet uitlezen op Makro.nl` 
-            : `❌ Geen ScraperAPI sleutel geconfigureerd in .env.local (SCRAPERAPI_KEY).`
+          message: msg
         });
         continue;
       }
