@@ -1,5 +1,23 @@
 export type BaseUnit = "stuk" | "gram" | "kg" | "ml" | "liter" | "portie";
 
+export const ALLERGENS = [
+  "Gluten",
+  "Schaaldieren",
+  "Ei",
+  "Vis",
+  "Pinda",
+  "Soja",
+  "Melk",
+  "Noten",
+  "Selderij",
+  "Mosterd",
+  "Sesam",
+  "Sulfiet",
+  "Lupine",
+  "Weekdieren"
+] as const;
+
+export type Allergen = typeof ALLERGENS[number];
 export type Supplier = {
   id: string;
   name: string;
@@ -49,6 +67,7 @@ export type Ingredient = {
   purchasePrice: number;
   pricePerBaseUnit: number;
   supplierOptions?: SupplierPriceOption[];
+  allergens?: string[]; // Array of allergens (e.g., ["Gluten", "Melk"])
   lastPriceUpdate: string;
   isActive: boolean;
   createdAt: string;

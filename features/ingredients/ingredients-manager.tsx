@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, ExternalLink, X } from "lucide-react";
+import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, ExternalLink, X, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
 import { deleteIngredientFromDb, getLocalStorageIngredients, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
 import { listSuppliers } from "@/services/suppliers.service";
-import type { Ingredient, IngredientCategory, Supplier, BaseUnit, SupplierPriceOption } from "@/types/core";
+import { type Ingredient, type IngredientCategory, type Supplier, type BaseUnit, type SupplierPriceOption, ALLERGENS } from "@/types/core";
 
 const baseUnits: BaseUnit[] = ["stuk", "gram", "kg", "ml", "liter", "portie"];
 
@@ -35,6 +35,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   // Paste Text Modal State (for Sligro/Hanos order confirmations & invoices)
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [allergenModalOpen, setAllergenModalOpen] = useState(false);
 
   const { notify } = useToast();
 
@@ -176,11 +177,15 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       deletedAt: null
     };
 
-    const saved = await saveIngredientToDb(next);
-    setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
-    setFormOpen(false);
-    notify({ title: editing ? "Ingrediënt bijgewerkt in Database" : "Ingrediënt opgeslagen in Database" });
-    await loadData();
+    try {
+      const saved = await saveIngredientToDb(next);
+      setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [saved, ...current]);
+      setFormOpen(false);
+      notify({ title: editing ? "Ingrediënt bijgewerkt in Database" : "Ingrediënt opgeslagen in Database" });
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Fout bij opslaan. Controleer de velden en leverancier.");
+    }
   };
 
   const removeIngredient = async (ingredient: Ingredient) => {
@@ -220,6 +225,10 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setAllergenModalOpen(true)} className="h-9 text-xs font-semibold border border-purple-500/40 text-purple-400 hover:bg-purple-500/10">
+            <Printer className="mr-1.5 h-3.5 w-3.5" /> Allergenenlijst
+          </Button>
+
           <Button variant="secondary" size="sm" onClick={() => setPasteModalOpen(true)} className="h-9 text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
             <Tag className="mr-1.5 h-3.5 w-3.5" />
             📋 Bestellijst / Factuur Plakken
@@ -478,6 +487,70 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
 
             <div className="flex justify-end border-t pt-3">
               <Button className="bg-gold text-background font-bold hover:bg-gold/90 text-xs" onClick={() => setSyncModalOpen(false)}>
+                Sluiten
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allergenenlijst Modal */}
+      {allergenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-xl border bg-background p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                  <Printer className="h-5 w-5 text-purple-400" /> Allergenenlijst Printen
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Een volledig overzicht van alle ingrediënten en de bijbehorende wettelijke allergenen.
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setAllergenModalOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-border/40">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 text-muted-foreground font-semibold border-b">
+                  <tr>
+                    <th className="px-3 py-2">Ingrediënt</th>
+                    {ALLERGENS.map(a => (
+                      <th key={a} className="px-2 py-2 text-center rotate-45 md:rotate-0 text-[10px] md:text-xs">
+                        {a.substring(0, 3)}.
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((ing) => (
+                    <tr key={ing.id} className="border-t hover:bg-muted/30">
+                      <td className="px-3 py-2 font-bold">{ing.name}</td>
+                      {ALLERGENS.map(a => {
+                        const hasAllergen = (ing.allergens || []).includes(a);
+                        return (
+                          <td key={a} className="px-2 py-2 text-center">
+                            {hasAllergen ? (
+                              <CheckCircle2 className="h-4 w-4 text-destructive mx-auto" />
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-between border-t pt-3">
+              <Button variant="secondary" className="text-xs font-bold" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" /> Print PDF / Overzicht
+              </Button>
+              <Button className="bg-purple-600 text-white font-bold hover:bg-purple-500 text-xs" onClick={() => setAllergenModalOpen(false)}>
                 Sluiten
               </Button>
             </div>
@@ -799,6 +872,34 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
             })}
           </div>
         )}
+      </div>
+
+      {/* Allergenen Section */}
+      <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+        <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+          <CheckCircle2 className="h-4 w-4 text-purple-400" /> Allergenen (Wettelijk Verplicht)
+        </h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          {ALLERGENS.map((allergen) => (
+            <label key={allergen} className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 bg-black/20"
+                checked={(form.allergens || []).includes(allergen)}
+                onChange={(e) => {
+                  const current = form.allergens || [];
+                  setForm({
+                    ...form,
+                    allergens: e.target.checked
+                      ? [...current, allergen]
+                      : current.filter((a) => a !== allergen)
+                  });
+                }}
+              />
+              {allergen}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t">

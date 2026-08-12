@@ -122,6 +122,7 @@ export async function listIngredients(): Promise<Ingredient[]> {
           purchasePrice: Number(item.purchase_price),
           pricePerBaseUnit: Number(item.price_per_base_unit || calculateUnitPrice(item.purchase_price, item.package_content)),
           supplierOptions: options,
+          allergens: item.allergens || [],
           lastPriceUpdate: item.last_price_update || item.created_at,
           isActive: item.is_active,
           createdAt: item.created_at,
@@ -166,6 +167,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     supplierArticleCode: ingredient.supplierArticleCode?.trim() || undefined,
     productUrl: ingredient.productUrl?.trim() || undefined,
     pricePerBaseUnit: unitPrice,
+    allergens: ingredient.allergens || [],
     updatedAt: timestamp
   };
 
@@ -191,6 +193,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
       supplier_article_code: sanitizedIngredient.supplierArticleCode || null,
       product_url: sanitizedIngredient.productUrl || null,
       supplier_options: sanitizedIngredient.supplierOptions || null,
+      allergens: sanitizedIngredient.allergens || null,
       base_unit: sanitizedIngredient.baseUnit,
       purchase_unit: sanitizedIngredient.purchaseUnit,
       package_content: sanitizedIngredient.packageContent,
@@ -203,7 +206,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
 
     if (error) {
       console.error("❌ Fout bij opslaan van ingrediënt in Supabase:", error.message, error.details);
-      // We loggen de fout nu luid en duidelijk, zonder agressief properties te wissen.
+      throw new Error(`Oeps! Database fout: ${error.message}`);
     }
   }
 
