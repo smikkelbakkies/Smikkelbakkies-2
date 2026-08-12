@@ -67,10 +67,22 @@ export async function listIngredients(): Promise<Ingredient[]> {
     if (!error && data) {
       const parsed: Ingredient[] = data.map((item) => {
         const local = localItemsMap.get(item.id);
-        const articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
-        const productUrl = item.product_url || local?.productUrl || undefined;
 
-        const options = item.supplier_options || local?.supplierOptions || undefined;
+        let articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
+        let productUrl = item.product_url || local?.productUrl || undefined;
+        let options = item.supplier_options || local?.supplierOptions || undefined;
+
+        // Decode metadata JSON fallback if custom columns were missing in remote DB table
+        if (articleCode && articleCode.startsWith("{") && articleCode.endsWith("}")) {
+          try {
+            const meta = JSON.parse(articleCode);
+            articleCode = meta.sku || undefined;
+            if (!productUrl && meta.url) productUrl = meta.url;
+            if (!options && meta.options) options = meta.options;
+          } catch {
+            // Ignore parse errors
+          }
+        }
 
         return {
           id: item.id,
@@ -126,7 +138,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     updatedAt: timestamp
   };
 
-  // LocalStorage persistence (always retain supplierArticleCode)
+  // LocalStorage persistence (always retain supplierArticleCode & productUrl & supplierOptions)
   const currentLocal = getLocalStorageIngredients();
   const index = currentLocal.findIndex((i) => i.id === sanitizedIngredient.id);
   let updatedLocal: Ingredient[];
@@ -140,6 +152,12 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
 
   // Supabase persistence
   if (isSupabaseConfigured && supabase) {
+    const metaPayload = JSON.stringify({
+      sku: sanitizedIngredient.supplierArticleCode || "",
+      url: sanitizedIngredient.productUrl || "",
+      options: sanitizedIngredient.supplierOptions || []
+    });
+
     const fullPayload: any = {
       id: sanitizedIngredient.id,
       name: sanitizedIngredient.name,
@@ -159,9 +177,11 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     let { error } = await supabase.from("ingredients").upsert(fullPayload);
 
     if (error) {
-      delete fullPayload.supplier_article_code;
       delete fullPayload.product_url;
       delete fullPayload.supplier_options;
+      // Encode metadata payload into supplier_article_code for 100% cross-device cloud sync
+      fullPayload.supplier_article_code = metaPayload;
+
       const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
       if (fallbackResult.error) {
         console.error("Supabase ingredient save fallback error:", fallbackResult.error);
