@@ -30,6 +30,8 @@ export function EventCalculator() {
     fixedCosts: 75,
     staffCosts: 0,
     targetEventMargin: 30,
+    calculationMode: "margin",
+    targetPricePerPerson: 15,
     partnersCount: 2
   });
 
@@ -418,12 +420,50 @@ export function EventCalculator() {
                   <label className="block text-xs font-bold text-foreground flex items-center gap-1.5">
                     <DollarSign className="h-4 w-4 text-gold" /> Prijsbepaling & Rendement
                   </label>
-                  <span className="text-[10px] text-gold font-medium">
-                    Bereken via Gewenst Uurloon (€/uur) óf Marge (%)
-                  </span>
+                  <div className="flex bg-muted/50 p-1 rounded-md">
+                    <button
+                      type="button"
+                      className={`px-3 py-1 text-[10px] font-bold rounded ${params.calculationMode !== "price" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setParams({ ...params, calculationMode: "margin" })}
+                    >
+                      Via Marge/Uurloon
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1 text-[10px] font-bold rounded ${params.calculationMode === "price" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setParams({ ...params, calculationMode: "price" })}
+                    >
+                      Via Vaste Prijs p.p.
+                    </button>
+                  </div>
                 </div>
 
-                {/* Option 1: Reverse Calculation by Desired Hourly Wage */}
+                {params.calculationMode === "price" ? (
+                  <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-500" />
+                      <span className="text-xs font-bold text-purple-700 dark:text-purple-400">Doel: Vaste Prijs per Persoon</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">€</span>
+                      <Input
+                        type="number"
+                        className="h-10 text-base font-bold max-w-[120px]"
+                        value={params.targetPricePerPerson || ""}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/^0+(?=\d)/, '');
+                          setParams({ ...params, targetPricePerPerson: parseFloat(val) || 0 });
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">per persoon (excl. BTW)</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      De calculator toont aan de rechterkant welke VOF-winst en winstmarge er bij deze vaste prijs overblijven.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Option 1: Reverse Calculation by Desired Hourly Wage */}
                 <div className="rounded-lg border border-gold/40 bg-gold/5 p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-gold flex items-center gap-1">
@@ -505,6 +545,8 @@ export function EventCalculator() {
                     </div>
                   </div>
                 </div>
+                </>
+                )}
               </div>
             </CardContent>
           </Card>

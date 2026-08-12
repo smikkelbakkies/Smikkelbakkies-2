@@ -165,6 +165,8 @@ export type EventPackageParams = {
   fixedCosts: number; // opstartkosten, gas, stroom, foodtruck afschrijving
   staffCosts: number; // optionele extra hulp buiten vennoten
   targetEventMargin: number; // 20, 30, 40, 45%
+  calculationMode?: "margin" | "price";
+  targetPricePerPerson?: number;
   partnersCount: number; // 2 for VOF
 };
 
@@ -180,6 +182,7 @@ export type EventCalculationResult = {
   totalVofProfit: number;
   profitPerPartner: number;
   hourlyEarningsPerPartner: number;
+  achievedMargin: number;
   isFeasibleForVof: boolean;
   feasibilityReason: string;
 };

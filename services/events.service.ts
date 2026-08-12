@@ -43,6 +43,7 @@ let savedEvents: SavedEvent[] = [
       totalVofProfit: 217.8,
       profitPerPartner: 108.9,
       hourlyEarningsPerPartner: 39.6,
+      achievedMargin: 35,
       isFeasibleForVof: true,
       feasibilityReason: "Uitstekend VOF-rendement (> €35/uur per vennoot)."
     },
@@ -68,9 +69,22 @@ export async function calculateEventPackage(params: EventPackageParams): Promise
   const totalKmCost = params.distanceKm * params.costPerKm;
   const totalDirectCosts = totalFoodCost + totalKmCost + params.fixedCosts + params.staffCosts;
 
-  const marginFraction = Math.min(Math.max(params.targetEventMargin, 5), 80) / 100;
-  const advisedPackagePrice = totalDirectCosts / (1 - marginFraction);
-  const pricePerPerson = advisedPackagePrice / peopleCount;
+  let advisedPackagePrice = 0;
+  let pricePerPerson = 0;
+  let achievedMargin = 0;
+
+  if (params.calculationMode === "price" && params.targetPricePerPerson) {
+    pricePerPerson = params.targetPricePerPerson;
+    advisedPackagePrice = pricePerPerson * peopleCount;
+    achievedMargin = advisedPackagePrice > 0 
+      ? ((advisedPackagePrice - totalDirectCosts) / advisedPackagePrice) * 100 
+      : 0;
+  } else {
+    const marginFraction = Math.min(Math.max(params.targetEventMargin, 5), 80) / 100;
+    advisedPackagePrice = totalDirectCosts / (1 - marginFraction);
+    pricePerPerson = advisedPackagePrice / peopleCount;
+    achievedMargin = params.targetEventMargin;
+  }
 
   const totalVofProfit = advisedPackagePrice - totalDirectCosts;
   const partnersCount = Math.max(params.partnersCount || 2, 1);
@@ -106,6 +120,7 @@ export async function calculateEventPackage(params: EventPackageParams): Promise
     totalVofProfit,
     profitPerPartner,
     hourlyEarningsPerPartner,
+    achievedMargin,
     isFeasibleForVof,
     feasibilityReason
   };

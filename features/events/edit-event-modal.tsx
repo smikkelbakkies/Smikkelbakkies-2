@@ -270,31 +270,62 @@ export function EditEventModal({ event, open, onClose, onEventUpdated }: EditEve
                   onChange={(e) => handleParamChange({ ...params, fixedCosts: parseFloat(e.target.value) || 0 })}
                 />
               </div>
-              <div>
-                <label className="block font-semibold mb-1 text-gold">Gewenst Uurloon (€/u)</label>
-                <Input
-                  type="number"
-                  placeholder="bijv. 50"
-                  className="border-gold/40 text-gold font-bold focus-visible:ring-gold"
-                  value={targetHourlyRateInput}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/^0+(?=\d)/, '');
-                    setTargetHourlyRateInput(val);
-                    handleTargetHourlyRateChange(parseFloat(val) || 0);
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Winstmarge (%)</label>
-                <Input
-                  type="number"
-                  value={params.targetEventMargin}
-                  onChange={(e) => {
-                    setTargetHourlyRateInput("");
-                    handleParamChange({ ...params, targetEventMargin: parseFloat(e.target.value) || 0 });
-                  }}
-                />
-              </div>
+              {params.calculationMode === "price" ? (
+                <div className="col-span-2">
+                  <label className="block font-semibold mb-1 text-purple-600">Vaste Prijs p.p. (€)</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={params.targetPricePerPerson || ""}
+                      onChange={(e) => handleParamChange({ ...params, targetPricePerPerson: parseFloat(e.target.value) || 0 })}
+                    />
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => handleParamChange({ ...params, calculationMode: "margin" })}
+                    >
+                      Via Marge
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-semibold mb-1 text-gold">Gewenst Uurloon (€/u)</label>
+                    <Input
+                      type="number"
+                      placeholder="bijv. 50"
+                      className="border-gold/40 text-gold font-bold focus-visible:ring-gold"
+                      value={targetHourlyRateInput}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^0+(?=\d)/, '');
+                        setTargetHourlyRateInput(val);
+                        handleTargetHourlyRateChange(parseFloat(val) || 0);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Winstmarge (%) 
+                      <button 
+                        type="button"
+                        className="text-[10px] ml-2 text-purple-600 font-bold underline"
+                        onClick={() => handleParamChange({ ...params, calculationMode: "price" })}
+                      >
+                        Prijs p.p.?
+                      </button>
+                    </label>
+                    <Input
+                      type="number"
+                      value={params.targetEventMargin}
+                      onChange={(e) => {
+                        setTargetHourlyRateInput("");
+                        handleParamChange({ ...params, targetEventMargin: parseFloat(e.target.value) || 0 });
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
