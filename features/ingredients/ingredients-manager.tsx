@@ -497,7 +497,7 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       {/* Allergenenlijst Modal */}
       {allergenModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-4xl rounded-xl border bg-background p-6 shadow-2xl space-y-5 my-8">
+          <div className="w-full max-w-4xl rounded-xl border bg-background p-6 shadow-2xl space-y-5 my-8 printable-allergen-sheet">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
