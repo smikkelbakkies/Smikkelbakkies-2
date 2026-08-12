@@ -603,6 +603,7 @@ function IngredientForm({ ingredient, categories, suppliers, error, onSubmit }: 
     portionWeight: ingredient?.portionWeight ?? undefined,
     purchasePrice: ingredient?.purchasePrice ?? 0,
     supplierOptions: ingredient?.supplierOptions ?? [],
+    allergens: ingredient?.allergens ?? [],
     isActive: ingredient?.isActive ?? true
   }));
 
