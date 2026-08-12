@@ -43,15 +43,6 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       const [ingData, supData] = await Promise.all([listIngredients(), listSuppliers()]);
       if (ingData && ingData.length > 0) {
         setItems(ingData);
-
-        // Automatically sync any local metadata (SKUs, URLs, supplierOptions) to cloud DB in background
-        const localItems = getLocalStorageIngredients();
-        const itemsToSync = localItems.filter(
-          (i: Ingredient) => i.supplierArticleCode || i.productUrl || (i.supplierOptions && i.supplierOptions.length > 0)
-        );
-        if (itemsToSync.length > 0) {
-          Promise.all(itemsToSync.map((i: Ingredient) => saveIngredientToDb(i))).catch(() => {});
-        }
       }
       if (supData && supData.length > 0) {
         setSupplierList(supData);

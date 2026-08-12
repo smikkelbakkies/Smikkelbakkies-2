@@ -65,12 +65,15 @@ export async function listIngredients(): Promise<Ingredient[]> {
       .order("name");
 
     if (!error && data) {
+      const needsMigration: any[] = [];
+
       const parsed: Ingredient[] = data.map((item) => {
         const local = localItemsMap.get(item.id);
 
-        let articleCode = item.supplier_article_code || local?.supplierArticleCode || undefined;
-        let productUrl = item.product_url || local?.productUrl || undefined;
-        let options = item.supplier_options || local?.supplierOptions || undefined;
+        let articleCode = item.supplier_article_code || undefined;
+        let productUrl = item.product_url || undefined;
+        let options = item.supplier_options || undefined;
+        let requireMigrate = false;
 
         // Decode metadata JSON fallback if stored in supplier_article_code or notes
         const metaStr = (item.supplier_article_code && item.supplier_article_code.startsWith("{"))
@@ -85,15 +88,26 @@ export async function listIngredients(): Promise<Ingredient[]> {
             if ((!articleCode || articleCode.startsWith("{")) && meta.sku) articleCode = meta.sku;
             if (!productUrl && meta.url) productUrl = meta.url;
             if (!options && meta.options) options = meta.options;
+            requireMigrate = true;
           } catch {
             // Ignore parse errors
           }
         }
 
-        // If local has richer data (sku, url, options), retain it
-        if (!articleCode && local?.supplierArticleCode) articleCode = local.supplierArticleCode;
-        if (!productUrl && local?.productUrl) productUrl = local.productUrl;
-        if (!options && local?.supplierOptions) options = local.supplierOptions;
+        // If local has richer data (sku, url, options) and cloud has none, use local and flag migration
+        if (!articleCode && local?.supplierArticleCode) { articleCode = local.supplierArticleCode; requireMigrate = true; }
+        if (!productUrl && local?.productUrl) { productUrl = local.productUrl; requireMigrate = true; }
+        if (!options && local?.supplierOptions) { options = local.supplierOptions; requireMigrate = true; }
+
+        if (requireMigrate) {
+          needsMigration.push({
+            id: item.id,
+            supplier_article_code: articleCode || null,
+            product_url: productUrl || null,
+            supplier_options: options || null,
+            notes: null // clear notes as data is extracted
+          });
+        }
 
         return {
           id: item.id,
@@ -115,6 +129,12 @@ export async function listIngredients(): Promise<Ingredient[]> {
           deletedAt: item.deleted_at
         };
       });
+
+      if (needsMigration.length > 0) {
+        Promise.all(
+          needsMigration.map((m) => supabase.from("ingredients").update(m).eq("id", m.id))
+        ).catch((err) => console.error("Migratie van oude JSON properties is mislukt:", err));
+      }
 
       setLocalStorageIngredients(parsed);
       return parsed;
@@ -161,14 +181,8 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
   }
   setLocalStorageIngredients(updatedLocal);
 
-  // Supabase persistence with triple-level column fallback
+  // Supabase persistence
   if (isSupabaseConfigured && supabase) {
-    const metaPayload = JSON.stringify({
-      sku: sanitizedIngredient.supplierArticleCode || "",
-      url: sanitizedIngredient.productUrl || "",
-      options: sanitizedIngredient.supplierOptions || []
-    });
-
     const fullPayload: any = {
       id: sanitizedIngredient.id,
       name: sanitizedIngredient.name,
@@ -185,23 +199,11 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
       updated_at: timestamp
     };
 
-    let { error } = await supabase.from("ingredients").upsert(fullPayload);
+    const { error } = await supabase.from("ingredients").upsert(fullPayload);
 
     if (error) {
-      delete fullPayload.product_url;
-      delete fullPayload.supplier_options;
-      fullPayload.supplier_article_code = metaPayload;
-
-      let err2 = await supabase.from("ingredients").upsert(fullPayload);
-      if (err2.error) {
-        delete fullPayload.supplier_article_code;
-        fullPayload.notes = metaPayload;
-        let err3 = await supabase.from("ingredients").upsert(fullPayload);
-        if (err3.error) {
-          delete fullPayload.notes;
-          await supabase.from("ingredients").upsert(fullPayload);
-        }
-      }
+      console.error("❌ Fout bij opslaan van ingrediënt in Supabase:", error.message, error.details);
+      // We loggen de fout nu luid en duidelijk, zonder agressief properties te wissen.
     }
   }
 
