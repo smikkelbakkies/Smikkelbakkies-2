@@ -3,7 +3,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { categories as mockCategories, ingredients as mockIngredients } from "@/services/mock-data";
 import type { Ingredient, IngredientCategory } from "@/types/core";
 
-function getLocalStorageIngredients(): Ingredient[] {
+export function getLocalStorageIngredients(): Ingredient[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem("smikkel_ingredients");
@@ -72,17 +72,28 @@ export async function listIngredients(): Promise<Ingredient[]> {
         let productUrl = item.product_url || local?.productUrl || undefined;
         let options = item.supplier_options || local?.supplierOptions || undefined;
 
-        // Decode metadata JSON fallback if custom columns were missing in remote DB table
-        if (articleCode && articleCode.startsWith("{") && articleCode.endsWith("}")) {
+        // Decode metadata JSON fallback if stored in supplier_article_code or notes
+        const metaStr = (item.supplier_article_code && item.supplier_article_code.startsWith("{"))
+          ? item.supplier_article_code
+          : (item.notes && item.notes.startsWith("{"))
+            ? item.notes
+            : null;
+
+        if (metaStr) {
           try {
-            const meta = JSON.parse(articleCode);
-            articleCode = meta.sku || undefined;
+            const meta = JSON.parse(metaStr);
+            if ((!articleCode || articleCode.startsWith("{")) && meta.sku) articleCode = meta.sku;
             if (!productUrl && meta.url) productUrl = meta.url;
             if (!options && meta.options) options = meta.options;
           } catch {
             // Ignore parse errors
           }
         }
+
+        // If local has richer data (sku, url, options), retain it
+        if (!articleCode && local?.supplierArticleCode) articleCode = local.supplierArticleCode;
+        if (!productUrl && local?.productUrl) productUrl = local.productUrl;
+        if (!options && local?.supplierOptions) options = local.supplierOptions;
 
         return {
           id: item.id,
@@ -150,7 +161,7 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
   }
   setLocalStorageIngredients(updatedLocal);
 
-  // Supabase persistence
+  // Supabase persistence with triple-level column fallback
   if (isSupabaseConfigured && supabase) {
     const metaPayload = JSON.stringify({
       sku: sanitizedIngredient.supplierArticleCode || "",
@@ -179,12 +190,17 @@ export async function saveIngredientToDb(ingredient: Ingredient): Promise<Ingred
     if (error) {
       delete fullPayload.product_url;
       delete fullPayload.supplier_options;
-      // Encode metadata payload into supplier_article_code for 100% cross-device cloud sync
       fullPayload.supplier_article_code = metaPayload;
 
-      const fallbackResult = await supabase.from("ingredients").upsert(fullPayload);
-      if (fallbackResult.error) {
-        console.error("Supabase ingredient save fallback error:", fallbackResult.error);
+      let err2 = await supabase.from("ingredients").upsert(fullPayload);
+      if (err2.error) {
+        delete fullPayload.supplier_article_code;
+        fullPayload.notes = metaPayload;
+        let err3 = await supabase.from("ingredients").upsert(fullPayload);
+        if (err3.error) {
+          delete fullPayload.notes;
+          await supabase.from("ingredients").upsert(fullPayload);
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, ExternalLink, CloudUpload, X } from "lucide-react";
+import { CheckCircle2, Edit3, Filter, Plus, RefreshCw, Scale, Search, Sparkles, Trash2, Tag, ArrowRight, Building2, Check, ExternalLink, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { calculateUnitPrice, formatCurrency, formatDate } from "@/lib/utils";
-import { deleteIngredientFromDb, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
+import { deleteIngredientFromDb, getLocalStorageIngredients, hasDuplicateIngredientName, listIngredients, saveIngredientToDb, syncIngredientPricesByArticleCode } from "@/services/ingredients.service";
 import { listSuppliers } from "@/services/suppliers.service";
 import type { Ingredient, IngredientCategory, Supplier, BaseUnit, SupplierPriceOption } from "@/types/core";
 
@@ -36,7 +36,6 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
 
-  const [pushingCloud, setPushingCloud] = useState(false);
   const { notify } = useToast();
 
   const loadData = async () => {
@@ -45,12 +44,13 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       if (ingData && ingData.length > 0) {
         setItems(ingData);
 
-        // Auto-push any locally saved metadata (SKUs, URLs, supplierOptions) to cloud DB once
-        const itemsWithMetadata = ingData.filter(
-          (i) => i.supplierArticleCode || i.productUrl || (i.supplierOptions && i.supplierOptions.length > 0)
+        // Automatically sync any local metadata (SKUs, URLs, supplierOptions) to cloud DB in background
+        const localItems = getLocalStorageIngredients();
+        const itemsToSync = localItems.filter(
+          (i: Ingredient) => i.supplierArticleCode || i.productUrl || (i.supplierOptions && i.supplierOptions.length > 0)
         );
-        if (itemsWithMetadata.length > 0) {
-          Promise.all(itemsWithMetadata.map((i) => saveIngredientToDb(i))).catch(() => {});
+        if (itemsToSync.length > 0) {
+          Promise.all(itemsToSync.map((i: Ingredient) => saveIngredientToDb(i))).catch(() => {});
         }
       }
       if (supData && supData.length > 0) {
@@ -64,28 +64,6 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
   useEffect(() => {
     loadData();
   }, []);
-
-  const handlePushAllLocalToCloud = async () => {
-    setPushingCloud(true);
-    try {
-      let count = 0;
-      for (const item of items) {
-        if (item.supplierArticleCode || item.productUrl || (item.supplierOptions && item.supplierOptions.length > 0)) {
-          await saveIngredientToDb(item);
-          count++;
-        }
-      }
-      notify({
-        title: "☁️ Gegevens Gekoppeld aan Cloud!",
-        description: `✅ ${count} ingrediënt(en) met artikelcodes en links zijn live naar de cloud gepusht. Open de app op je andere apparaat en alle gegevens staan er direct!`
-      });
-      await loadData();
-    } catch {
-      notify({ title: "Fout bij pushen naar cloud" });
-    } finally {
-      setPushingCloud(false);
-    }
-  };
 
   const filtered = useMemo(() => {
     return items
@@ -251,17 +229,6 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handlePushAllLocalToCloud}
-            disabled={pushingCloud}
-            className="h-9 text-xs font-bold border border-gold/50 text-gold hover:bg-gold/15 shadow-sm"
-          >
-            <CloudUpload className={`mr-1.5 h-4 w-4 text-gold ${pushingCloud ? "animate-bounce" : ""}`} />
-            {pushingCloud ? "Pushen naar Cloud..." : "☁️ Push Gegevens naar Cloud (Alle Apparaten)"}
-          </Button>
-
           <Button variant="secondary" size="sm" onClick={() => setPasteModalOpen(true)} className="h-9 text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
             <Tag className="mr-1.5 h-3.5 w-3.5" />
             📋 Bestellijst / Factuur Plakken
