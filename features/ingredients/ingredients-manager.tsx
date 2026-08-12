@@ -498,7 +498,14 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
       {allergenModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="w-full max-w-4xl rounded-xl border bg-background p-6 shadow-2xl space-y-5 my-8 printable-allergen-sheet">
-            <div className="flex items-center justify-between border-b pb-3">
+            {/* Print Header (Only visible when printing) */}
+            <div className="hidden print:block mb-8 text-center border-b-2 border-black pb-4">
+              <h1 className="text-3xl font-black uppercase tracking-widest text-black">Smikkelbakkies</h1>
+              <h2 className="text-xl font-medium text-gray-600 mt-1">Officiële Allergenen Informatie</h2>
+              <p className="text-sm text-gray-500 mt-2">Peildatum: {new Date().toLocaleDateString('nl-NL')}</p>
+            </div>
+
+            <div className="flex items-center justify-between border-b pb-3 print:hidden">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
                   <Printer className="h-5 w-5 text-purple-400" /> Allergenenlijst Printen
@@ -512,41 +519,53 @@ export function IngredientsManager({ initialIngredients, categories, suppliers }
               </Button>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-border/40">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground font-semibold border-b">
+            <div className="overflow-x-auto rounded-lg border border-border/40 print:border-none print:shadow-none print:overflow-visible">
+              <table className="w-full text-left text-xs print:text-sm border-collapse">
+                <thead className="bg-muted/40 print:bg-gray-100 text-muted-foreground print:text-black font-semibold border-b-2 print:border-b-2 print:border-black">
                   <tr>
-                    <th className="px-3 py-2">Ingrediënt</th>
+                    <th className="px-3 py-4 align-bottom print:w-1/3">Ingrediënt</th>
                     {ALLERGENS.map(a => (
-                      <th key={a} className="px-2 py-2 text-center rotate-45 md:rotate-0 text-[10px] md:text-xs">
-                        {a.substring(0, 3)}.
+                      <th key={a} className="px-1 py-4 align-bottom text-center" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                        <span className="inline-block py-1 px-1 print:font-bold whitespace-nowrap">{a}</span>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((ing) => (
-                    <tr key={ing.id} className="border-t hover:bg-muted/30">
-                      <td className="px-3 py-2 font-bold">{ing.name}</td>
-                      {ALLERGENS.map(a => {
-                        const hasAllergen = (ing.allergens || []).includes(a);
-                        return (
-                          <td key={a} className="px-2 py-2 text-center">
-                            {hasAllergen ? (
-                              <CheckCircle2 className="h-4 w-4 text-destructive mx-auto" />
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                  {items.map((ing) => {
+                    const hasAnyAllergen = (ing.allergens || []).length > 0;
+                    return (
+                      <tr key={ing.id} className="border-b border-border/20 print:border-gray-300 hover:bg-muted/30 print:break-inside-avoid">
+                        <td className={`px-3 py-2 ${hasAnyAllergen ? 'font-bold print:font-bold text-foreground print:text-black' : 'font-normal text-muted-foreground print:text-gray-700'}`}>
+                          {ing.name}
+                        </td>
+                        {ALLERGENS.map(a => {
+                          const hasAllergen = (ing.allergens || []).includes(a);
+                          return (
+                            <td key={a} className="px-1 py-2 text-center border-l border-border/10 print:border-gray-200">
+                              {hasAllergen ? (
+                                <div className="w-5 h-5 mx-auto rounded bg-red-100/50 print:bg-red-100 border border-red-200/50 print:border-red-300 flex items-center justify-center print:print-color-adjust-exact">
+                                  <span className="text-red-700 font-bold text-[10px]">X</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/20 print:text-gray-300">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex justify-between border-t pt-3">
+            {/* Print Footer (Only visible when printing) */}
+            <div className="hidden print:block mt-8 text-xs text-gray-500 text-center font-medium italic">
+              * Kruisbesmetting in onze keuken is helaas nooit 100% uit te sluiten. Heeft u een ernstige allergie? Meld dit altijd aan ons personeel.
+            </div>
+
+            <div className="flex justify-between border-t pt-3 print:hidden">
               <Button variant="secondary" className="text-xs font-bold" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" /> Print PDF / Overzicht
               </Button>
